@@ -49,7 +49,7 @@
 }
 
 * { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; }
+html { -webkit-text-size-adjust: 100%; overflow-x: hidden; }
 body {
   margin: 0;
   font-family: var(--font-body);
@@ -58,6 +58,8 @@ body {
   font-size: 15px;
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  width: 100%;
 }
 h1, h2, h3, h4 { margin: 0 0 0.4em; line-height: 1.25; font-weight: 700; letter-spacing: -0.01em; }
 p { margin: 0 0 1em; color: var(--color-text-muted); }
@@ -102,7 +104,9 @@ ul { padding-left: 1.2em; }
 .input, select.input, textarea.input {
   width: 100%; padding: 12px 14px; border-radius: var(--radius-sm);
   border: 1.5px solid var(--color-border); background: var(--color-surface);
-  font-size: 14.5px; color: var(--color-text); transition: border-color .15s;
+  /* 16px minimum: iOS Safari auto-zooms the whole page on focus for any
+     input below this size, which feels broken on mobile. */
+  font-size: 16px; color: var(--color-text); transition: border-color .15s;
 }
 .input:focus, select.input:focus, textarea.input:focus { outline: none; border-color: var(--color-primary); }
 .input--prefix-wrap { position: relative; }
@@ -178,7 +182,10 @@ textarea.input { resize: vertical; min-height: 90px; }
 @keyframes shimmer { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
 
 /* --------------------------------- Public nav ------------------------------- */
-#site-header { position: sticky; top: 0; z-index: 500; background: rgba(255,255,255,0.92); backdrop-filter: blur(8px); border-bottom: 1px solid var(--color-border); }
+/* No backdrop-filter here: it would make this sticky header a new containing
+   block for its position:fixed descendants (the mobile nav drawer), breaking
+   full-viewport positioning of the slide-in menu. */
+#site-header { position: sticky; top: 0; z-index: 500; background: rgba(255,255,255,0.97); border-bottom: 1px solid var(--color-border); }
 .nav-wrap { max-width: 1180px; margin: 0 auto; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; height: 64px; }
 .brand { display: flex; align-items: center; gap: 9px; font-weight: 800; font-size: 17px; color: var(--color-navy); }
 .brand__mark { width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(135deg, var(--color-primary), var(--color-teal)); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 15px; }
