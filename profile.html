@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Profile — Hunny Invests</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/dashboard.css">
+<link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+<div id="app-shell"></div>
+
+<script type="module">
+  import { requireAuth, isAdminRole } from "./js/guards.js";
+  import { renderAppShell, toast, confirmModal } from "./js/ui.js";
+  import { getUnreadCount } from "./js/notifications.js";
+  import { updateDocById, COLLECTIONS } from "./js/firestore.js";
+  import { changePassword, logoutUser } from "./js/auth.js";
+  import { isNonEmpty, isValidPhone, isValidPassword, validateForm } from "./js/validators.js";
+  import { escapeHTML } from "./js/utils.js";
+
+  async function init() {
+    const session = await requireAuth(["investor", "owner", "admin", "super_admin"]);
+    if (!session) return;
+    const role = session.userRecord.role;
+    const shellRole = isAdminRole(role) ? "admin" : role;
+    const unreadCount = await getUnreadCount(session.user.uid);
+    const page = renderAppShell({ role: shellRole, active: "profile", title: "Profile", profile: session.profile, unreadCount });
+
+    page.innerHTML = `
+      <div class="card" style="margin-bottom:20px;">
+        <div class="flex gap-16" style="align-items:center;margin-bottom:16px;">
+          <span class="avatar" style="width:56px;height:56px;font-size:22px;">${escapeHTML((session.profile?.fullName || "U").charAt(0).toUpperCase())}</span>
+          <div>
+            <h3 class="mb-0">${escapeHTML(session.profile?.fullName || "—")}</h3>
+            <span class="badge badge--blue" style="margin-top:6px;display:inline-block;">${escapeHTML(role)}</span>
+          </div>
+        </div>
+        <div class="form-group"><label class="form-label">Full Name</label><input class="input" id="fullName" value="${escapeHTML(session.profile?.fullName || "")}"></div>
+        <div class="form-group"><label class="form-label">Phone</label><input class="input" id="phone" value="${escapeHTML(session.profile?.phone || "")}"></div>
+        <div class="form-group"><label class="form-label">Email</label><input class="input" value="${escapeHTML(session.user.email)}" disabled></div>
+        <div class="form-error" id="profile-error"></div>
+        <button class="btn btn--primary" id="save-profile-btn">Save Changes</button>
+      </div>
+
+      <div class="card" style="margin-bottom:20px;">
+        <h3>Change Password</h3>
+        <div class="form-group"><label class="form-label">Current Password</label><input class="input" type="password" id="currentPassword"></div>
+        <div class="form-group"><label class="form-label">New Password</label><input class="input" type="password" id="newPassword"></div>
+        <div class="form-error" id="password-error"></div>
+        <button class="btn btn--ghost" id="change-password-btn">Update Password</button>
+      </div>
+
+      <div class="card">
+        <h3>Account</h3>
+        <div class="kv-row"><span>Account Status</span><span class="badge badge--green">${escapeHTML(session.userRecord.status || "active")}</span></div>
+        <div class="kv-row"><span>Member Since</span><span>${session.userRecord.createdAt ? new Date(session.userRecord.createdAt.toDate ? session.userRecord.createdAt.toDate() : session.userRecord.createdAt).toLocaleDateString() : "—"}</span></div>
+        <button class="btn btn--danger btn--block" id="logout-btn2" style="margin-top:14px;">Log Out</button>
+      </div>`;
+
+    document.getElementById("save-profile-btn").addEventListener("click", async () => {
+      const fullName = document.getElementById("fullName").value.trim();
+      const phone = document.getElementById("phone").value.trim();
+      const errorBox = document.getElementById("profile-error");
+      const { valid, errors } = validateForm({
+        fullName: { value: fullName, rules: [[isNonEmpty, "Full name is required."]] },
+        phone: { value: phone, rules: [[isValidPhone, "Enter a valid Pakistani phone number."]] }
+      });
+      if (!valid) { errorBox.textContent = Object.values(errors)[0]; return; }
+      errorBox.textContent = "";
+      try {
+        await updateDocById(COLLECTIONS.PROFILES, session.user.uid, { fullName, phone });
+        toast("Profile updated.", "success");
+      } catch (e) {
+        errorBox.textContent = "Could not update profile.";
+      }
+    });
+
+    document.getElementById("change-password-btn").addEventListener("click", async () => {
+      const currentPassword = document.getElementById("currentPassword").value;
+      const newPassword = document.getElementById("newPassword").value;
+      const errorBox = document.getElementById("password-error");
+      if (!isNonEmpty(currentPassword)) { errorBox.textContent = "Enter your current password."; return; }
+      if (!isValidPassword(newPassword)) { errorBox.textContent = "New password must be at least 6 characters."; return; }
+      errorBox.textContent = "";
+      try {
+        await changePassword(currentPassword, newPassword);
+        toast("Password updated.", "success");
+        document.getElementById("currentPassword").value = "";
+        document.getElementById("newPassword").value = "";
+      } catch (e) {
+        errorBox.textContent = "Could not update password. Check your current password.";
+      }
+    });
+
+    document.getElementById("logout-btn2").addEventListener("click", async () => {
+      const ok = await confirmModal("Are you sure you want to log out?", { title: "Log out", confirmText: "Log out" });
+      if (ok) { await logoutUser(); window.location.href = "login.html"; }
+    });
+  }
+
+  init();
+</script>
+</body>
+</html>

@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Overview — Hunny Invests</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/dashboard.css">
+<link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+<div id="app-shell"></div>
+
+<script type="module">
+  import { requireAuth } from "./js/guards.js";
+  import { renderAppShell, loadingHTML, errorHTML } from "./js/ui.js";
+  import { getPlatformOverview } from "./js/admin.js";
+  import { getUnreadCount } from "./js/notifications.js";
+  import { formatPKR, formatNumber } from "./js/utils.js";
+
+  async function init() {
+    const session = await requireAuth(["admin", "super_admin"]);
+    if (!session) return;
+    const unreadCount = await getUnreadCount(session.user.uid);
+    const page = renderAppShell({ role: "admin", active: "admin-dashboard", title: "Platform Overview", profile: session.profile, unreadCount });
+    page.innerHTML = loadingHTML("Loading overview…");
+
+    try {
+      const s = await getPlatformOverview();
+      page.innerHTML = `
+        <div class="stat-grid">
+          <div class="stat-card stat-card--accent"><div class="stat-card__label">👥 Total Users</div><div class="stat-card__value">${formatNumber(s.totalUsers)}</div></div>
+          <div class="stat-card"><div class="stat-card__label">🧑 Investors</div><div class="stat-card__value">${formatNumber(s.investors)}</div></div>
+          <div class="stat-card"><div class="stat-card__label">🏭 Owners</div><div class="stat-card__value">${formatNumber(s.owners)}</div></div>
+          <div class="stat-card"><div class="stat-card__label">📦 Active Opportunities</div><div class="stat-card__value">${formatNumber(s.activeOpportunities)}</div></div>
+          <div class="stat-card"><div class="stat-card__label">💰 Total Wallet Deposits</div><div class="stat-card__value">${formatPKR(s.totalWalletDeposits)}</div></div>
+          <div class="stat-card"><div class="stat-card__label">🔒 Locked Investments</div><div class="stat-card__value">${formatPKR(s.lockedInvestments)}</div></div>
+          <div class="stat-card"><div class="stat-card__label">⬇️ Pending Deposits</div><div class="stat-card__value">${formatNumber(s.pendingDeposits)}</div></div>
+          <div class="stat-card"><div class="stat-card__label">⬆️ Pending Withdrawals</div><div class="stat-card__value">${formatNumber(s.pendingWithdrawals)}</div></div>
+          <div class="stat-card"><div class="stat-card__label">↩️ Pending Refunds</div><div class="stat-card__value">${formatNumber(s.pendingRefunds)}</div></div>
+          <div class="stat-card"><div class="stat-card__label">⚖️ Matured Opportunities</div><div class="stat-card__value">${formatNumber(s.maturedOpportunities)}</div></div>
+        </div>
+
+        <div class="dash-section">
+          <div class="dash-section__head"><h2>Quick Links</h2></div>
+          <div class="flex gap-12 flex-wrap">
+            <a href="admin-deposits.html" class="btn btn--primary btn--sm">Review Deposits</a>
+            <a href="admin-withdrawals.html" class="btn btn--ghost btn--sm">Review Withdrawals</a>
+            <a href="admin-opportunities.html" class="btn btn--ghost btn--sm">Review Opportunities</a>
+            <a href="admin-owners.html" class="btn btn--ghost btn--sm">Manage Owners</a>
+            <a href="admin-settlements.html" class="btn btn--ghost btn--sm">Settlements</a>
+          </div>
+        </div>`;
+    } catch (e) {
+      console.error(e);
+      page.innerHTML = errorHTML("Could not load platform overview.");
+    }
+  }
+
+  init();
+</script>
+</body>
+</html>

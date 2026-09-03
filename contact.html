@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Contact — Hunny Invests</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+<header id="site-header"></header>
+
+<main class="section container" style="max-width:640px;">
+  <div class="section-head">
+    <span class="eyebrow">Get in touch</span>
+    <h1>Contact Us</h1>
+    <p>Questions about a deposit, withdrawal, or an opportunity? Reach out and our admin team will get back to you.</p>
+  </div>
+
+  <div class="card" style="margin-bottom:20px;">
+    <div class="kv-row"><span>Support Email</span><span>support@hunnyinvests.pk</span></div>
+    <div class="kv-row"><span>WhatsApp Support</span><span>+92 300 0000000</span></div>
+    <div class="kv-row"><span>Response Time</span><span>Within 24 hours</span></div>
+  </div>
+
+  <div class="card" id="contact-card">
+    <h3>Send us a message</h3>
+    <div id="contact-form-area"></div>
+  </div>
+</main>
+
+<footer id="site-footer"></footer>
+
+<script type="module">
+  import { renderPublicNav, toast } from "./js/ui.js";
+  import { getOptionalSession } from "./js/guards.js";
+  import { createDoc, COLLECTIONS, serverTimestamp } from "./js/firestore.js";
+  import { isNonEmpty, validateForm } from "./js/validators.js";
+
+  const area = document.getElementById("contact-form-area");
+
+  async function init() {
+    const session = await getOptionalSession();
+    renderPublicNav("contact", session);
+
+    if (!session.user) {
+      area.innerHTML = `<p class="text-muted">Please <a href="login.html?redirect=contact.html">log in</a> to send a support message directly, or email us using the address above.</p>`;
+      return;
+    }
+
+    area.innerHTML = `
+      <div class="form-group"><label class="form-label">Subject</label><input class="input" id="c-subject" placeholder="e.g. Deposit not showing up"></div>
+      <div class="form-group"><label class="form-label">Message</label><textarea class="input" id="c-message" rows="4" placeholder="Describe your issue…"></textarea></div>
+      <div class="form-error" id="c-error"></div>
+      <button class="btn btn--primary btn--block" id="c-submit">Send Message</button>`;
+
+    document.getElementById("c-submit").addEventListener("click", async () => {
+      const subject = document.getElementById("c-subject").value.trim();
+      const message = document.getElementById("c-message").value.trim();
+      const errBox = document.getElementById("c-error");
+      const { valid, errors } = validateForm({
+        subject: { value: subject, rules: [[isNonEmpty, "Subject is required."]] },
+        message: { value: message, rules: [[isNonEmpty, "Message is required."]] }
+      });
+      if (!valid) { errBox.textContent = Object.values(errors)[0]; return; }
+      errBox.textContent = "";
+      try {
+        await createDoc(COLLECTIONS.SUPPORT_TICKETS, {
+          userId: session.user.uid,
+          userEmail: session.user.email,
+          subject, message, status: "open", createdAt: serverTimestamp()
+        });
+        toast("Message sent — we'll get back to you soon.", "success");
+        document.getElementById("c-subject").value = "";
+        document.getElementById("c-message").value = "";
+      } catch (e) {
+        errBox.textContent = "Could not send your message. Please try again.";
+      }
+    });
+  }
+
+  init();
+</script>
+</body>
+</html>

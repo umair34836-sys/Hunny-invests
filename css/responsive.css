@@ -1,0 +1,53 @@
+/* responsive.css — breakpoint overrides. Mobile styles are the defaults in
+   style.css/dashboard.css; this file scales things up for tablet/desktop. */
+
+/* ---------------------------------- ~600px ----------------------------------- */
+@media (min-width: 600px) {
+  .hero__stats { grid-template-columns: repeat(3, 1fr); }
+  .stat-grid { grid-template-columns: repeat(3, 1fr); }
+  .opp-grid { grid-template-columns: repeat(2, 1fr); }
+  .form-row--2 { grid-template-columns: 1fr 1fr; }
+  .form-row--3 { grid-template-columns: repeat(3, 1fr); }
+  .topbar__username { display: inline; }
+}
+
+/* ---------------------------------- ~768px ------------------------------------ */
+@media (min-width: 768px) {
+  .nav-toggle { display: none; }
+  .public-nav {
+    position: static; transform: none; flex-direction: row; align-items: center;
+    padding: 0; background: transparent; overflow: visible;
+  }
+  .public-nav a { border-bottom: none; padding: 8px 12px; font-size: 14px; }
+  .public-nav__auth { flex-direction: row; margin-top: 0; margin-left: 12px; }
+
+  .footer-wrap { grid-template-columns: 2fr 1fr 1fr; }
+
+  .opp-grid { grid-template-columns: repeat(3, 1fr); }
+  .hero__grid { grid-template-columns: 1.1fr 0.9fr; }
+  .hero h1 { font-size: 40px; }
+
+  .stat-grid { grid-template-columns: repeat(4, 1fr); }
+  .investment-card__figures { grid-template-columns: repeat(4, 1fr); }
+}
+
+/* ---------------------------------- ~1024px ------------------------------------ */
+@media (min-width: 1024px) {
+  .sidebar {
+    display: flex; flex-direction: column; width: var(--sidebar-w); flex-shrink: 0;
+    background: var(--color-navy); padding: 20px 14px; position: sticky; top: 0; height: 100vh;
+  }
+  .bottom-nav { display: none; }
+  .page-content { padding: 26px 32px 40px; }
+  .topbar { padding: 0 32px; }
+
+  .data-table-wrap { display: block; overflow-x: auto; border-radius: var(--radius-lg); border: 1px solid var(--color-border); }
+  .record-cards { display: none; }
+
+  .steps { grid-template-columns: repeat(3, 1fr); }
+  .opp-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+@media (min-width: 1180px) {
+  .opp-grid { grid-template-columns: repeat(4, 1fr); }
+}

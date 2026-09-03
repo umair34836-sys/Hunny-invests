@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Settlements — Admin — Hunny Invests</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/dashboard.css">
+<link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+<div id="app-shell"></div>
+
+<script type="module">
+  import { requireAuth } from "./js/guards.js";
+  import { renderAppShell, loadingHTML, errorHTML, emptyHTML, statusBadge, toast, confirmModal } from "./js/ui.js";
+  import { listOpportunitiesByStatus } from "./js/opportunities.js";
+  import { adminRunSettlement, getAllSettlements } from "./js/settlements.js";
+  import { getUnreadCount } from "./js/notifications.js";
+  import { formatPKR, formatDate, escapeHTML } from "./js/utils.js";
+  import { calculateTotalReturnObligation } from "./js/calculations.js";
+
+  let currentAdminId;
+
+  async function load() {
+    const page = document.getElementById("page-content");
+    page.innerHTML = loadingHTML("Loading settlements…");
+    try {
+      const [matured, pending, completedSettlements] = await Promise.all([
+        listOpportunitiesByStatus("matured"),
+        listOpportunitiesByStatus("settlement_pending"),
+        getAllSettlements()
+      ]);
+      const readyList = [...matured, ...pending];
+      const maturitySettlements = completedSettlements.filter((s) => s.type === "maturity");
+
+      page.innerHTML = `
+        <div class="dash-section">
+          <div class="dash-section__head"><h2>Ready for Settlement</h2></div>
+          <div id="ready-list">${readyList.length ? readyList.map((o) => `
+            <div class="record-card">
+              <div class="record-card__top"><span class="record-card__title">${escapeHTML(o.title)}</span>${statusBadge(o.status)}</div>
+              <div class="record-card__grid">
+                <div><span>Sold Units</span>${o.soldQuantity || 0}</div>
+                <div><span>Investor Obligation</span>${formatPKR(calculateTotalReturnObligation(o.fundedAmount, o.investorReturnPercent))}</div>
+              </div>
+              <div class="record-card__actions"><button class="btn btn--primary btn--sm settle-btn" data-id="${o.id}">Run Settlement</button></div>
+            </div>`).join("") : emptyHTML("No opportunities awaiting settlement.", { icon: "✅" })}</div>
+        </div>
+
+        <div class="dash-section">
+          <div class="dash-section__head"><h2>Settlement History</h2></div>
+          <div class="data-table-wrap"><table class="data-table">
+            <thead><tr><th>Opportunity</th><th>Outcome</th><th>Investors</th><th>Total Payout</th><th>Total Profit Paid</th><th>Date</th></tr></thead>
+            <tbody>${maturitySettlements.length ? maturitySettlements.map((s) => `<tr><td>${s.opportunityId}</td><td>${statusBadge(s.outcome)}</td><td>${s.investorCount}</td><td class="money">${formatPKR(s.totalPayout)}</td><td>${formatPKR(s.totalProfit)}</td><td>${s.processedAt ? formatDate(s.processedAt) : "—"}</td></tr>`).join("") : `<tr><td colspan="6" class="text-muted text-center">No settlements processed yet.</td></tr>`}</tbody>
+          </table></div>
+        </div>`;
+
+      document.querySelectorAll(".settle-btn").forEach((btn) => btn.addEventListener("click", async () => {
+        const ok = await confirmModal("Run final settlement for this opportunity? This will pay out all active investors based on recorded sales. This cannot be undone.", { title: "Run Settlement", danger: true });
+        if (!ok) return;
+        try {
+          await adminRunSettlement(btn.dataset.id, currentAdminId);
+          toast("Settlement completed.", "success"); load();
+        } catch (e) { toast(e.message || "Could not run settlement.", "error"); }
+      }));
+    } catch (e) {
+      console.error(e);
+      page.innerHTML = errorHTML("Could not load settlements.");
+    }
+  }
+
+  async function init() {
+    const session = await requireAuth(["admin", "super_admin"]);
+    if (!session) return;
+    currentAdminId = session.user.uid;
+    const unreadCount = await getUnreadCount(session.user.uid);
+    renderAppShell({ role: "admin", active: "admin-settlements", title: "Settlements", profile: session.profile, unreadCount });
+    load();
+  }
+
+  init();
+</script>
+</body>
+</html>

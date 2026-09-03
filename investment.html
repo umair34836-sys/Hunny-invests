@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Investment Details — Hunny Invests</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/dashboard.css">
+<link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+<div id="app-shell"></div>
+
+<script type="module">
+  import { requireAuth } from "./js/guards.js";
+  import { renderAppShell, loadingHTML, errorHTML, statusBadge, progressBar, confirmModal, toast } from "./js/ui.js";
+  import { getInvestment, requestEarlyExit } from "./js/investments.js";
+  import { getOpportunity } from "./js/opportunities.js";
+  import { getSalesForOpportunity } from "./js/sales.js";
+  import { getUnreadCount } from "./js/notifications.js";
+  import { formatPKR, formatPercent, formatDate, formatDateTime, getQueryParam, escapeHTML } from "./js/utils.js";
+  import { calculateFundingProgress, calculateEarlyExitFee, calculateEarlyExitRefund } from "./js/calculations.js";
+
+  async function init() {
+    const session = await requireAuth(["investor"]);
+    if (!session) return;
+    const unreadCount = await getUnreadCount(session.user.uid);
+    const page = renderAppShell({ role: "investor", active: "investments", title: "Investment Details", profile: session.profile, unreadCount });
+    page.innerHTML = loadingHTML("Loading investment…");
+
+    const id = getQueryParam("id");
+    if (!id) { page.innerHTML = errorHTML("No investment specified."); return; }
+
+    let inv;
+    try { inv = await getInvestment(id); } catch (e) { page.innerHTML = errorHTML("Could not load this investment."); return; }
+    if (!inv || inv.investorId !== session.user.uid) { page.innerHTML = errorHTML("Investment not found."); return; }
+
+    const opp = await getOpportunity(inv.opportunityId).catch(() => null);
+    const sales = opp ? await getSalesForOpportunity(opp.id).catch(() => []) : [];
+    const progress = opp ? calculateFundingProgress(opp.fundedAmount, opp.requiredCapital) : 0;
+
+    const canExit = inv.status === "invested";
+    const exitFee = calculateEarlyExitFee(inv.investedAmount, inv.earlyExitFeePercent);
+    const exitRefund = calculateEarlyExitRefund(inv.investedAmount, inv.earlyExitFeePercent);
+
+    page.innerHTML = `
+      <div class="flex-between flex-wrap gap-8" style="margin-bottom:10px;">
+        <h2 class="mb-0">${escapeHTML(inv.opportunityTitle || "Opportunity")}</h2>
+        ${statusBadge(inv.status)}
+      </div>
+      <a href="opportunity.html?id=${inv.opportunityId}" style="font-size:13px;">View full opportunity →</a>
+
+      <div class="card" style="margin:16px 0;">
+        <h3>Your Investment</h3>
+        <div class="kv-row"><span>Invested Amount</span><span class="money">${formatPKR(inv.investedAmount)}</span></div>
+        <div class="kv-row"><span>Advertised Return</span><span>${formatPercent(inv.investorReturnPercent)}</span></div>
+        <div class="kv-row"><span>Expected Profit</span><span class="money">${formatPKR(inv.expectedProfit)}</span></div>
+        <div class="kv-row"><span>Expected Maturity Payout</span><span class="money">${formatPKR(inv.expectedMaturityAmount)}</span></div>
+        <div class="kv-row"><span>Stock Participation Share</span><span>${inv.stockSharePercent}%</span></div>
+        <div class="kv-row"><span>Invested On</span><span>${formatDate(inv.investedAt)}</span></div>
+        <div class="kv-row"><span>Active Since</span><span>${inv.activeAt ? formatDate(inv.activeAt) : "Not started yet"}</span></div>
+        <div class="kv-row"><span>Maturity Date</span><span>${inv.maturityAt ? formatDate(inv.maturityAt) : "Set once active"}</span></div>
+      </div>
+
+      ${opp ? `
+      <div class="card" style="margin-bottom:16px;">
+        <h3>Opportunity Progress</h3>
+        <div class="kv-row"><span>Funding</span><span>${formatPKR(opp.fundedAmount)} / ${formatPKR(opp.requiredCapital)}</span></div>
+        ${progressBar(progress)}
+        <div class="divider"></div>
+        <div class="kv-row"><span>Stock Quantity</span><span>${opp.stockQuantity}</span></div>
+        <div class="kv-row"><span>Sold</span><span>${opp.soldQuantity}</span></div>
+        <div class="kv-row"><span>Remaining</span><span>${opp.remainingQuantity}</span></div>
+        <div class="kv-row"><span>Revenue So Far</span><span>${formatPKR(opp.revenueTotal)}</span></div>
+      </div>` : ""}
+
+      ${inv.status === "completed" || inv.status === "refunded" || inv.status === "exited" ? `
+      <div class="card" style="margin-bottom:16px;">
+        <h3>Settlement Result</h3>
+        <div class="kv-row"><span>Outcome</span><span>${statusBadge(inv.status)}</span></div>
+        <div class="kv-row"><span>Payout / Refund</span><span class="money">${formatPKR(inv.payoutAmount ?? inv.refundAmount ?? 0)}</span></div>
+        ${inv.exitFee ? `<div class="kv-row"><span>Early Exit Fee</span><span>${formatPKR(inv.exitFee)}</span></div>` : ""}
+        <div class="kv-row"><span>Completed On</span><span>${inv.completedAt ? formatDateTime(inv.completedAt) : "—"}</span></div>
+      </div>` : ""}
+
+      ${canExit ? `
+      <div class="card" style="margin-bottom:16px;">
+        <h3>Early Exit</h3>
+        <p class="text-muted">You can exit this investment before the investment period starts. A ${formatPercent(inv.earlyExitFeePercent)} fee applies.</p>
+        <div class="kv-row"><span>You would receive</span><span class="money">${formatPKR(exitRefund)}</span></div>
+        <div class="kv-row"><span>Fee</span><span>${formatPKR(exitFee)}</span></div>
+        <button class="btn btn--danger btn--block" id="exit-btn" style="margin-top:12px;">Request Early Exit</button>
+      </div>` : ""}
+
+      <div class="alert alert--warning">
+        <strong>Terms:</strong> This return is fixed to your own invested amount, not a share of business profit. If zero units sell by maturity, you receive principal minus ${formatPercent(inv.zeroSaleRefundFeePercent)}.
+      </div>`;
+
+    if (canExit) {
+      document.getElementById("exit-btn").addEventListener("click", async () => {
+        const ok = await confirmModal(`Exit now for a refund of ${formatPKR(exitRefund)} (fee: ${formatPKR(exitFee)})?`, { title: "Confirm Early Exit", confirmText: "Exit Now", danger: true });
+        if (!ok) return;
+        try {
+          await requestEarlyExit({ investmentId: inv.id, investorId: session.user.uid });
+          toast("Early exit processed.", "success");
+          setTimeout(() => window.location.reload(), 900);
+        } catch (e) {
+          toast(e.message || "Could not process early exit.", "error");
+        }
+      });
+    }
+  }
+
+  init();
+</script>
+</body>
+</html>

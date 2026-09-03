@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wallet — Hunny Invests</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/dashboard.css">
+<link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+<div id="app-shell"></div>
+
+<script type="module">
+  import { requireAuth } from "./js/guards.js";
+  import { renderAppShell, loadingHTML, emptyHTML, errorHTML, statusBadge } from "./js/ui.js";
+  import { getWallet, getUserDepositRequests, getUserWithdrawalRequests, getUserWalletTransactions, cancelDepositRequest, cancelWithdrawalRequest } from "./js/wallet.js";
+  import { getUnreadCount } from "./js/notifications.js";
+  import { formatPKR, formatDateTime } from "./js/utils.js";
+  import { toast, confirmModal } from "./js/ui.js";
+
+  async function init() {
+    const session = await requireAuth(["investor"]);
+    if (!session) return;
+    const unreadCount = await getUnreadCount(session.user.uid);
+    const page = renderAppShell({ role: "investor", active: "wallet", title: "Wallet", profile: session.profile, unreadCount });
+    page.innerHTML = loadingHTML("Loading your wallet…");
+
+    try {
+      const [wallet, deposits, withdrawals, txs] = await Promise.all([
+        getWallet(session.user.uid),
+        getUserDepositRequests(session.user.uid),
+        getUserWithdrawalRequests(session.user.uid),
+        getUserWalletTransactions(session.user.uid, 20)
+      ]);
+
+      page.innerHTML = `
+        <div class="wallet-hero">
+          <div class="wallet-hero__label">Available Balance</div>
+          <div class="wallet-hero__value">${formatPKR(wallet?.availableBalance)}</div>
+          <div class="wallet-hero__row">
+            <span>Locked: ${formatPKR(wallet?.lockedBalance)}</span>
+            <span>Total Deposited: ${formatPKR(wallet?.totalDeposited)}</span>
+          </div>
+        </div>
+        <div class="flex gap-12 flex-wrap" style="margin-bottom:24px;">
+          <a href="deposit.html" class="btn btn--primary">Deposit Funds</a>
+          <a href="withdraw.html" class="btn btn--ghost">Request Withdrawal</a>
+        </div>
+
+        <div class="dash-section">
+          <div class="dash-section__head"><h2>Deposit Requests</h2></div>
+          <div id="deposits-list"></div>
+        </div>
+        <div class="dash-section">
+          <div class="dash-section__head"><h2>Withdrawal Requests</h2></div>
+          <div id="withdrawals-list"></div>
+        </div>
+        <div class="dash-section">
+          <div class="dash-section__head"><h2>Recent Wallet Activity</h2><a href="transactions.html" style="font-size:13px;">View all →</a></div>
+          <div id="tx-list"></div>
+        </div>`;
+
+      document.getElementById("deposits-list").innerHTML = deposits.length ? deposits.map((d) => `
+        <div class="record-card">
+          <div class="record-card__top"><span class="record-card__title">${formatPKR(d.amount)}</span>${statusBadge(d.status)}</div>
+          <div class="record-card__meta">${formatDateTime(d.requestedAt)} · ${d.paymentMethod || "bank_transfer"}</div>
+          ${d.status === "pending" ? `<div class="record-card__actions"><button class="btn btn--ghost btn--sm cancel-deposit" data-id="${d.id}">Cancel</button></div>` : ""}
+        </div>`).join("") : emptyHTML("No deposit requests yet.", { icon: "⬇️" });
+
+      document.getElementById("withdrawals-list").innerHTML = withdrawals.length ? withdrawals.map((w) => `
+        <div class="record-card">
+          <div class="record-card__top"><span class="record-card__title">${formatPKR(w.amount)}</span>${statusBadge(w.status)}</div>
+          <div class="record-card__meta">${formatDateTime(w.requestedAt)} · ${w.paymentMethod || "bank_transfer"}</div>
+          ${w.status === "pending" ? `<div class="record-card__actions"><button class="btn btn--ghost btn--sm cancel-withdrawal" data-id="${w.id}">Cancel</button></div>` : ""}
+        </div>`).join("") : emptyHTML("No withdrawal requests yet.", { icon: "⬆️" });
+
+      document.getElementById("tx-list").innerHTML = txs.length ? `<div class="record-cards">${txs.map(txRow).join("")}</div>` : emptyHTML("No wallet activity yet.", { icon: "🧾" });
+
+      document.querySelectorAll(".cancel-deposit").forEach((btn) => btn.addEventListener("click", async () => {
+        const ok = await confirmModal("Cancel this pending deposit request?");
+        if (!ok) return;
+        await cancelDepositRequest(btn.dataset.id);
+        toast("Deposit request cancelled.", "success");
+        init();
+      }));
+      document.querySelectorAll(".cancel-withdrawal").forEach((btn) => btn.addEventListener("click", async () => {
+        const ok = await confirmModal("Cancel this pending withdrawal request?");
+        if (!ok) return;
+        await cancelWithdrawalRequest(btn.dataset.id);
+        toast("Withdrawal request cancelled.", "success");
+        init();
+      }));
+    } catch (e) {
+      console.error(e);
+      page.innerHTML = errorHTML("Could not load your wallet.");
+    }
+  }
+
+  function txRow(t) {
+    return `<div class="record-card">
+      <div class="record-card__top"><span class="record-card__title">${formatPKR(t.amount)}</span><span class="pill-tag">${t.type}</span></div>
+      <div class="record-card__meta">${formatDateTime(t.createdAt)}</div>
+      <p style="font-size:12.5px;margin:6px 0 0;">${t.description || ""}</p>
+    </div>`;
+  }
+
+  init();
+</script>
+</body>
+</html>

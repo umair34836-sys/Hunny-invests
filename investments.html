@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Investments — Hunny Invests</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/dashboard.css">
+<link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+<div id="app-shell"></div>
+
+<script type="module">
+  import { requireAuth } from "./js/guards.js";
+  import { renderAppShell, loadingHTML, emptyHTML, errorHTML, statusBadge } from "./js/ui.js";
+  import { getInvestorInvestments, filterInvestmentsByStage } from "./js/investments.js";
+  import { getUnreadCount } from "./js/notifications.js";
+  import { formatPKR } from "./js/utils.js";
+
+  const TABS = [
+    { key: "all", label: "All" },
+    { key: "active", label: "Active" },
+    { key: "completed", label: "Completed" },
+    { key: "refunded", label: "Refunded" }
+  ];
+  let allInvestments = [];
+  let currentTab = "all";
+
+  function render() {
+    const list = filterInvestmentsByStage(allInvestments, currentTab);
+    const container = document.getElementById("investments-list");
+    container.innerHTML = list.length ? list.map((inv) => `
+      <div class="investment-card">
+        <div class="investment-card__head">
+          <div><strong>${inv.opportunityTitle || "Opportunity"}</strong><div class="text-muted" style="font-size:12px;">Invested ${formatPKR(inv.investedAmount)}</div></div>
+          ${statusBadge(inv.status)}
+        </div>
+        <div class="investment-card__figures">
+          <div class="investment-card__figure"><span>Return</span><strong>${inv.investorReturnPercent}%</strong></div>
+          <div class="investment-card__figure"><span>Expected Profit</span><strong>${formatPKR(inv.expectedProfit)}</strong></div>
+          <div class="investment-card__figure"><span>Maturity Payout</span><strong>${formatPKR(inv.expectedMaturityAmount)}</strong></div>
+          <div class="investment-card__figure"><span>Stock Share</span><strong>${inv.stockSharePercent}%</strong></div>
+        </div>
+        <a href="investment.html?id=${inv.id}" class="btn btn--ghost btn--sm btn--block">View Details</a>
+      </div>`).join("") : emptyHTML("No investments in this category.", { icon: "💼" });
+  }
+
+  async function init() {
+    const session = await requireAuth(["investor"]);
+    if (!session) return;
+    const unreadCount = await getUnreadCount(session.user.uid);
+    const page = renderAppShell({ role: "investor", active: "investments", title: "My Investments", profile: session.profile, unreadCount });
+    page.innerHTML = loadingHTML("Loading your investments…");
+
+    try {
+      allInvestments = await getInvestorInvestments(session.user.uid);
+      page.innerHTML = `
+        <div class="tabs" id="tabs">${TABS.map((t) => `<button class="tab-btn ${t.key === "all" ? "active" : ""}" data-tab="${t.key}">${t.label}</button>`).join("")}</div>
+        <div id="investments-list"></div>`;
+      render();
+      document.querySelectorAll(".tab-btn").forEach((btn) => btn.addEventListener("click", () => {
+        document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        currentTab = btn.dataset.tab;
+        render();
+      }));
+    } catch (e) {
+      console.error(e);
+      page.innerHTML = errorHTML("Could not load your investments.");
+    }
+  }
+
+  init();
+</script>
+</body>
+</html>

@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manage Opportunity — Hunny Invests</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/dashboard.css">
+<link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+<div id="app-shell"></div>
+
+<script type="module">
+  import { requireAuth } from "./js/guards.js";
+  import { renderAppShell, loadingHTML, errorHTML, statusBadge, progressBar, toast, confirmModal } from "./js/ui.js";
+  import { getOpportunity, submitForReview, ownerStartInvestment, ownerSubmitSettlement } from "./js/opportunities.js";
+  import { getOpportunityInvestments } from "./js/investments.js";
+  import { getOpportunityFinancialSummary } from "./js/owner.js";
+  import { getUnreadCount } from "./js/notifications.js";
+  import { formatPKR, formatPercent, formatDate, escapeHTML, getQueryParam } from "./js/utils.js";
+  import { calculateFundingProgress, calculateTotalReturnObligation } from "./js/calculations.js";
+
+  const id = getQueryParam("id");
+
+  async function init() {
+    const session = await requireAuth(["owner"]);
+    if (!session) return;
+    const unreadCount = await getUnreadCount(session.user.uid);
+    const page = renderAppShell({ role: "owner", active: "owner-opportunities", title: "Manage Opportunity", profile: session.profile, unreadCount });
+    page.innerHTML = loadingHTML("Loading opportunity…");
+
+    if (!id) { page.innerHTML = errorHTML("No opportunity specified."); return; }
+    const opp = await getOpportunity(id).catch(() => null);
+    if (!opp || opp.ownerId !== session.user.uid) { page.innerHTML = errorHTML("Opportunity not found."); return; }
+
+    const [investments, summary] = await Promise.all([
+      getOpportunityInvestments(id),
+      getOpportunityFinancialSummary(id)
+    ]);
+    const progress = calculateFundingProgress(opp.fundedAmount, opp.requiredCapital);
+    const obligation = calculateTotalReturnObligation(opp.fundedAmount, opp.investorReturnPercent);
+
+    page.innerHTML = `
+      <div class="flex-between flex-wrap gap-8" style="margin-bottom:8px;">
+        <h2 class="mb-0">${escapeHTML(opp.title)}</h2>${statusBadge(opp.status)}
+      </div>
+      ${opp.status === "rejected" ? `<div class="alert alert--danger">Rejected: ${escapeHTML(opp.rejectionReason || "No reason given.")}</div>` : ""}
+      ${opp.status === "frozen" ? `<div class="alert alert--danger">Frozen by admin: ${escapeHTML(opp.freezeReason || "No reason given.")}</div>` : ""}
+
+      <div class="card" style="margin-bottom:16px;">
+        <div class="kv-row"><span>Funded</span><span>${formatPKR(opp.fundedAmount)} / ${formatPKR(opp.requiredCapital)}</span></div>
+        ${progressBar(progress)}
+        <div class="divider"></div>
+        <div class="kv-row"><span>Investor Return</span><span>${formatPercent(opp.investorReturnPercent)}</span></div>
+        <div class="kv-row"><span>Duration</span><span>${opp.durationMonths} months</span></div>
+        <div class="kv-row"><span>Investors</span><span>${opp.investorCount || 0}</span></div>
+        <div class="kv-row"><span>Total Return Obligation (if sold)</span><span class="money">${formatPKR(obligation)}</span></div>
+      </div>
+
+      <div id="action-panel"></div>
+
+      <div class="dash-section">
+        <div class="dash-section__head"><h2>Investor Participation</h2></div>
+        <div id="investors-list"></div>
+      </div>
+
+      <div class="dash-section">
+        <div class="dash-section__head"><h2>Financial Summary</h2></div>
+        <div class="card">
+          <div class="kv-row"><span>Total Revenue (sales)</span><span class="money">${formatPKR(summary.totalRevenue)}</span></div>
+          <div class="kv-row"><span>Total Expenses</span><span>${formatPKR(summary.totalExpenses)}</span></div>
+          <div class="kv-row"><span>Actual Purchase Cost</span><span>${formatPKR(opp.actualPurchaseCost || opp.purchaseCost)}</span></div>
+          <div class="kv-row"><span>Stock Sold / Remaining</span><span>${opp.soldQuantity || 0} / ${opp.remainingQuantity ?? opp.stockQuantity}</span></div>
+        </div>
+      </div>
+
+      <div class="flex gap-12 flex-wrap" style="margin-top:8px;">
+        <a href="owner-stock.html?id=${id}" class="btn btn--ghost btn--sm">Manage Stock &amp; Expenses</a>
+        <a href="owner-sales.html?id=${id}" class="btn btn--ghost btn--sm">Record Sales</a>
+        ${["matured", "settlement_pending"].includes(opp.status) ? `<a href="owner-settlement.html?id=${id}" class="btn btn--primary btn--sm">Go to Settlement</a>` : ""}
+      </div>
+    `;
+
+    document.getElementById("investors-list").innerHTML = investments.length ? `
+      <div class="data-table-wrap"><table class="data-table">
+        <thead><tr><th>Invested</th><th>Share</th><th>Status</th><th>Expected Payout</th></tr></thead>
+        <tbody>${investments.map((i) => `<tr><td class="money">${formatPKR(i.investedAmount)}</td><td>${i.stockSharePercent}%</td><td>${statusBadge(i.status)}</td><td>${formatPKR(i.expectedMaturityAmount)}</td></tr>`).join("")}</tbody>
+      </table></div>
+      <div class="record-cards">${investments.map((i) => `<div class="record-card"><div class="record-card__top"><span class="record-card__title money">${formatPKR(i.investedAmount)}</span>${statusBadge(i.status)}</div><div class="record-card__grid"><div><span>Share</span>${i.stockSharePercent}%</div><div><span>Payout</span>${formatPKR(i.expectedMaturityAmount)}</div></div></div>`).join("")}</div>`
+      : `<p class="text-muted">No investors yet.</p>`;
+
+    renderActionPanel(opp, session);
+  }
+
+  function renderActionPanel(opp, session) {
+    const panel = document.getElementById("action-panel");
+    if (opp.status === "draft") {
+      panel.innerHTML = `<div class="card"><p>This opportunity is a draft and not visible to investors. Submit it for admin review to go live.</p><button class="btn btn--primary" id="submit-review-btn">Submit for Review</button></div>`;
+      document.getElementById("submit-review-btn").addEventListener("click", async () => {
+        await submitForReview(opp.id, session.user.uid);
+        toast("Submitted for review.", "success");
+        init();
+      });
+    } else if (opp.status === "pending_review") {
+      panel.innerHTML = `<div class="alert alert--info">Awaiting admin review. You'll be notified once it's approved.</div>`;
+    } else if (opp.status === "funding") {
+      panel.innerHTML = `<div class="alert alert--info">Open for investment. Once 100% funded, you'll be able to purchase stock and start the investment period.</div>`;
+    } else if (opp.status === "awaiting_stock_purchase") {
+      panel.innerHTML = `
+        <div class="card">
+          <h3>🎉 Fully Funded — Purchase Stock &amp; Start Investment</h3>
+          <p class="text-muted">Purchase deadline: ${opp.stockPurchaseDeadline ? formatDate(opp.stockPurchaseDeadline) : "—"}. If you miss it, investors are refunded in full.</p>
+          <div class="form-row form-row--2">
+            <div class="form-group"><label class="form-label">Actual Purchase Cost (PKR)</label><input class="input" type="number" id="actualPurchaseCost" value="${opp.purchaseCost}"></div>
+            <div class="form-group"><label class="form-label">Purchased Quantity</label><input class="input" type="number" id="purchasedQuantity" value="${opp.stockQuantity}"></div>
+          </div>
+          <div class="form-group"><label class="form-label">Purchase Date</label><input class="input" type="date" id="purchaseDate"></div>
+          <div class="form-group"><label class="form-label">Reference / Proof (optional)</label><input class="input" id="referenceNote" placeholder="Invoice #, supplier reference…"></div>
+          <div class="form-error" id="purchase-error"></div>
+          <button class="btn btn--primary btn--block" id="start-btn">Stock Purchased — Start Investment</button>
+        </div>`;
+      document.getElementById("start-btn").addEventListener("click", async () => {
+        const actualPurchaseCost = Number(document.getElementById("actualPurchaseCost").value);
+        const purchasedQuantity = Number(document.getElementById("purchasedQuantity").value);
+        const purchaseDate = document.getElementById("purchaseDate").value;
+        const referenceNote = document.getElementById("referenceNote").value.trim();
+        const errorBox = document.getElementById("purchase-error");
+        if (!(actualPurchaseCost >= 0) || !(purchasedQuantity > 0)) { errorBox.textContent = "Enter valid purchase details."; return; }
+        const ok = await confirmModal("This will start the investment timer for all investors. Continue?", { title: "Start Investment Period" });
+        if (!ok) return;
+        try {
+          await ownerStartInvestment(opp.id, session.user.uid, { actualPurchaseCost, purchasedQuantity, purchaseDate, referenceNote });
+          toast("Investment period started!", "success");
+          init();
+        } catch (e) {
+          errorBox.textContent = e.message || "Could not start investment.";
+        }
+      });
+    } else if (opp.status === "active") {
+      const maturityPassed = opp.maturityAt && new Date(opp.maturityAt.toDate ? opp.maturityAt.toDate() : opp.maturityAt) <= new Date();
+      panel.innerHTML = `<div class="alert alert--info">Investment period active. Maturity date: ${opp.maturityAt ? formatDate(opp.maturityAt) : "—"}.</div>
+        ${maturityPassed ? `<div class="card"><p>This opportunity has reached its maturity date. Submit final settlement data for admin review.</p><button class="btn btn--primary" id="submit-settlement-btn">Submit for Settlement</button></div>` : ""}`;
+      if (maturityPassed) {
+        document.getElementById("submit-settlement-btn").addEventListener("click", async () => {
+          await ownerSubmitSettlement(opp.id, session.user.uid);
+          toast("Submitted for settlement.", "success");
+          init();
+        });
+      }
+    } else if (opp.status === "matured" || opp.status === "settlement_pending") {
+      panel.innerHTML = `<div class="alert alert--info">This opportunity has matured and is pending final settlement by admin.</div>`;
+    } else if (opp.status === "completed") {
+      panel.innerHTML = `<div class="alert alert--success">Settlement completed. See financial summary below.</div>`;
+    } else if (["refund_pending", "refunded"].includes(opp.status)) {
+      panel.innerHTML = `<div class="alert alert--warning">This opportunity was refunded to investors — the stock purchase deadline was not met.</div>`;
+    } else {
+      panel.innerHTML = "";
+    }
+  }
+
+  init();
+</script>
+</body>
+</html>

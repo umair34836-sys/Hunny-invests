@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Owners — Admin — Hunny Invests</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/dashboard.css">
+<link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+<div id="app-shell"></div>
+
+<script type="module">
+  import { requireAuth } from "./js/guards.js";
+  import { renderAppShell, loadingHTML, errorHTML, emptyHTML, toast, confirmModal } from "./js/ui.js";
+  import { getAllUsersByRole, revokeOwnerRole, suspendUser, reactivateUser } from "./js/admin.js";
+  import { getUnreadCount } from "./js/notifications.js";
+  import { getMany, COLLECTIONS } from "./js/firestore.js";
+  import { formatDate, escapeHTML } from "./js/utils.js";
+
+  let currentAdminId;
+
+  async function load() {
+    const page = document.getElementById("page-content");
+    page.innerHTML = loadingHTML("Loading owners…");
+    try {
+      const owners = await getAllUsersByRole("owner");
+      const profileDocs = await getMany(COLLECTIONS.PROFILES);
+      const profiles = Object.fromEntries(profileDocs.map((p) => [p.id, p]));
+      const opps = await getMany(COLLECTIONS.OPPORTUNITIES);
+      const oppCountByOwner = {};
+      opps.forEach((o) => { oppCountByOwner[o.ownerId] = (oppCountByOwner[o.ownerId] || 0) + 1; });
+
+      if (!owners.length) { page.innerHTML = emptyHTML("No approved owners yet.", { icon: "🏭", actionHTML: '<a href="admin-users.html" class="btn btn--primary btn--sm">Go to Investors to grant owner access</a>' }); return; }
+
+      page.innerHTML = `
+        <div class="data-table-wrap"><table class="data-table">
+          <thead><tr><th>Name</th><th>Email</th><th>Status</th><th>Opportunities</th><th>Since</th><th></th></tr></thead>
+          <tbody>${owners.map((o) => row(o, profiles, oppCountByOwner)).join("")}</tbody>
+        </table></div>
+        <div class="record-cards">${owners.map((o) => cardRow(o, profiles, oppCountByOwner)).join("")}</div>`;
+      wire();
+    } catch (e) {
+      console.error(e);
+      page.innerHTML = errorHTML("Could not load owners.");
+    }
+  }
+
+  function row(u, profiles, counts) {
+    const p = profiles[u.id] || {};
+    return `<tr><td>${escapeHTML(p.fullName || "—")}</td><td>${escapeHTML(u.email)}</td>
+      <td><span class="badge ${u.status === "suspended" ? "badge--red" : "badge--green"}">${escapeHTML(u.status || "active")}</span></td>
+      <td>${counts[u.id] || 0}</td><td>${formatDate(u.ownerApprovedAt || u.createdAt)}</td>
+      <td class="flex gap-8">
+        <button class="btn btn--ghost btn--sm revoke-btn" data-id="${u.id}">Revoke</button>
+        ${u.status === "suspended" ? `<button class="btn btn--ghost btn--sm reactivate-btn" data-id="${u.id}">Reactivate</button>` : `<button class="btn btn--danger btn--sm suspend-btn" data-id="${u.id}">Suspend</button>`}
+      </td></tr>`;
+  }
+  function cardRow(u, profiles, counts) {
+    const p = profiles[u.id] || {};
+    return `<div class="record-card">
+      <div class="record-card__top"><span class="record-card__title">${escapeHTML(p.fullName || u.email)}</span><span class="badge ${u.status === "suspended" ? "badge--red" : "badge--green"}">${escapeHTML(u.status || "active")}</span></div>
+      <div class="record-card__meta">${escapeHTML(u.email)} · ${counts[u.id] || 0} opportunities</div>
+      <div class="record-card__actions">
+        <button class="btn btn--ghost btn--sm revoke-btn" data-id="${u.id}">Revoke</button>
+        ${u.status === "suspended" ? `<button class="btn btn--ghost btn--sm reactivate-btn" data-id="${u.id}">Reactivate</button>` : `<button class="btn btn--danger btn--sm suspend-btn" data-id="${u.id}">Suspend</button>`}
+      </div></div>`;
+  }
+
+  function wire() {
+    document.querySelectorAll(".revoke-btn").forEach((btn) => btn.addEventListener("click", async () => {
+      const ok = await confirmModal("Revoke owner access? Their existing opportunities remain but they can no longer create new ones.", { title: "Revoke Owner Access", danger: true });
+      if (!ok) return;
+      await revokeOwnerRole(btn.dataset.id, currentAdminId);
+      toast("Owner access revoked.", "success");
+      load();
+    }));
+    document.querySelectorAll(".suspend-btn").forEach((btn) => btn.addEventListener("click", async () => {
+      const ok = await confirmModal("Suspend this owner's account?", { title: "Suspend Owner", danger: true });
+      if (!ok) return;
+      await suspendUser(btn.dataset.id, currentAdminId, "Suspended by admin");
+      toast("Owner suspended.", "success");
+      load();
+    }));
+    document.querySelectorAll(".reactivate-btn").forEach((btn) => btn.addEventListener("click", async () => {
+      await reactivateUser(btn.dataset.id, currentAdminId);
+      toast("Owner reactivated.", "success");
+      load();
+    }));
+  }
+
+  async function init() {
+    const session = await requireAuth(["admin", "super_admin"]);
+    if (!session) return;
+    currentAdminId = session.user.uid;
+    const unreadCount = await getUnreadCount(session.user.uid);
+    renderAppShell({ role: "admin", active: "admin-owners", title: "Owners", profile: session.profile, unreadCount });
+    load();
+  }
+
+  init();
+</script>
+</body>
+</html>

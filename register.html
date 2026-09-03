@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Create Account — Hunny Invests</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+<header id="site-header"></header>
+
+<main class="section container">
+  <div class="card auth-card">
+    <h1 style="font-size:22px;">Create your account</h1>
+    <p class="text-muted">Start investing in real opportunities today.</p>
+
+    <div class="form-group">
+      <label class="form-label">Full Name</label>
+      <input class="input" id="fullName" placeholder="e.g. Ahmed Khan" autocomplete="name">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Email</label>
+      <input class="input" type="email" id="email" placeholder="you@example.com" autocomplete="email">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Phone</label>
+      <input class="input" id="phone" placeholder="03XXXXXXXXX" autocomplete="tel">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Password</label>
+      <input class="input" type="password" id="password" placeholder="At least 6 characters" autocomplete="new-password">
+    </div>
+    <div class="checkbox-row form-group">
+      <input type="checkbox" id="agree">
+      <label for="agree">I agree to the <a href="terms.html" target="_blank">Terms of Service</a>, <a href="privacy.html" target="_blank">Privacy Policy</a> and <a href="risk-disclosure.html" target="_blank">Risk Disclosure</a>.</label>
+    </div>
+    <div class="form-error" id="form-error"></div>
+    <button class="btn btn--primary btn--block" id="register-btn">Create Account</button>
+    <hr class="divider">
+    <p class="text-center text-muted" style="font-size:13.5px;">Already have an account? <a href="login.html">Log in</a></p>
+  </div>
+</main>
+
+<footer id="site-footer"></footer>
+
+<script type="module">
+  import { renderPublicNav } from "./js/ui.js";
+  import { registerInvestor } from "./js/auth.js";
+  import { getOptionalSession, homeForRole } from "./js/guards.js";
+  import { isValidEmail, isValidPhone, isValidPassword, isNonEmpty, validateForm } from "./js/validators.js";
+
+  (async () => {
+    const session = await getOptionalSession();
+    renderPublicNav("", session);
+    if (session.user && session.userRecord) window.location.href = homeForRole(session.userRecord.role);
+  })();
+
+  document.getElementById("register-btn").addEventListener("click", async () => {
+    const fullName = document.getElementById("fullName").value.trim();
+    const email = document.getElementById("email").value.trim();
+    const phone = document.getElementById("phone").value.trim();
+    const password = document.getElementById("password").value;
+    const agree = document.getElementById("agree").checked;
+    const errorBox = document.getElementById("form-error");
+
+    const { valid, errors } = validateForm({
+      fullName: { value: fullName, rules: [[isNonEmpty, "Full name is required."]] },
+      email: { value: email, rules: [[isValidEmail, "Enter a valid email address."]] },
+      phone: { value: phone, rules: [[isValidPhone, "Enter a valid Pakistani phone number (03XXXXXXXXX)."]] },
+      password: { value: password, rules: [[isValidPassword, "Password must be at least 6 characters."]] }
+    });
+    if (!valid) { errorBox.textContent = Object.values(errors)[0]; return; }
+    if (!agree) { errorBox.textContent = "You must agree to the Terms, Privacy Policy and Risk Disclosure."; return; }
+    errorBox.textContent = "";
+
+    const btn = document.getElementById("register-btn");
+    btn.disabled = true; btn.textContent = "Creating account…";
+    try {
+      await registerInvestor({ fullName, email, phone, password });
+      window.location.href = "dashboard.html";
+    } catch (e) {
+      errorBox.textContent = e.code === "auth/email-already-in-use"
+        ? "This email is already registered. Try logging in instead."
+        : (e.message || "Could not create account.");
+      btn.disabled = false; btn.textContent = "Create Account";
+    }
+  });
+</script>
+</body>
+</html>

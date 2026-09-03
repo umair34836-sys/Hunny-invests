@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Platform Settings — Admin — Hunny Invests</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/dashboard.css">
+<link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+<div id="app-shell"></div>
+
+<script type="module">
+  import { requireAuth } from "./js/guards.js";
+  import { renderAppShell, loadingHTML, errorHTML, toast, confirmModal } from "./js/ui.js";
+  import { getOne, createDocWithId, COLLECTIONS, serverTimestamp } from "./js/firestore.js";
+  import { getAllUsersByRole, grantAdminRole } from "./js/admin.js";
+  import { getUnreadCount } from "./js/notifications.js";
+  import { escapeHTML } from "./js/utils.js";
+  import { isValidEmail } from "./js/validators.js";
+
+  const SETTINGS_DOC_ID = "general";
+
+  async function init() {
+    const session = await requireAuth(["admin", "super_admin"]);
+    if (!session) return;
+    const isSuperAdmin = session.userRecord.role === "super_admin";
+    const unreadCount = await getUnreadCount(session.user.uid);
+    const page = renderAppShell({ role: "admin", active: "admin-settings", title: "Platform Settings", profile: session.profile, unreadCount });
+    page.innerHTML = loadingHTML("Loading settings…");
+
+    try {
+      const settings = (await getOne(COLLECTIONS.PLATFORM_SETTINGS, SETTINGS_DOC_ID)) || {};
+      const admins = await getAllUsersByRole("admin");
+      const superAdmins = await getAllUsersByRole("super_admin");
+
+      page.innerHTML = `
+        <div class="card" style="margin-bottom:20px;">
+          <h3>Deposit Instructions</h3>
+          <div class="form-group"><label class="form-label">Bank Name</label><input class="input" id="bankName" value="${escapeHTML(settings.bankName || "Meezan Bank")}"></div>
+          <div class="form-group"><label class="form-label">Account Title</label><input class="input" id="accountTitle" value="${escapeHTML(settings.accountTitle || "Hunny Invests (Pvt.) Ltd.")}"></div>
+          <div class="form-group"><label class="form-label">Account Number / IBAN</label><input class="input" id="accountNumber" value="${escapeHTML(settings.accountNumber || "")}"></div>
+          <div class="form-group"><label class="form-label">Support Email</label><input class="input" id="supportEmail" value="${escapeHTML(settings.supportEmail || "support@hunnyinvests.pk")}"></div>
+          <div class="form-error" id="settings-error"></div>
+          <button class="btn btn--primary" id="save-settings-btn">Save Settings</button>
+        </div>
+
+        <div class="card" style="margin-bottom:20px;">
+          <h3>Default Platform Rates</h3>
+          <p class="text-muted" style="font-size:12.5px;">These apply as defaults for new opportunities; each opportunity stores its own copy so past investments are never affected.</p>
+          <div class="form-row form-row--2">
+            <div class="form-group"><label class="form-label">Zero-Sale Refund Fee (%)</label><input class="input" type="number" id="zeroSaleFee" value="${settings.zeroSaleRefundFeePercent ?? 1}"></div>
+            <div class="form-group"><label class="form-label">Early Exit Fee (%)</label><input class="input" type="number" id="earlyExitFee" value="${settings.earlyExitFeePercent ?? 2}"></div>
+          </div>
+          <div class="form-group"><label class="form-label">Default Stock Purchase Window (days)</label><input class="input" type="number" id="purchaseWindow" value="${settings.stockPurchaseWindowDays ?? 30}"></div>
+        </div>
+
+        <div class="card">
+          <h3>Admin Management</h3>
+          <div class="kv-row"><span>Super Admins</span><span>${superAdmins.length}</span></div>
+          <div class="kv-row"><span>Admins</span><span>${admins.length}</span></div>
+          ${isSuperAdmin ? `
+            <div class="form-group" style="margin-top:14px;"><label class="form-label">Grant admin access by User ID</label><input class="input" id="new-admin-uid" placeholder="Firebase Auth UID"></div>
+            <p class="form-hint">Find a user's UID from Firebase Console → Authentication, or from the Investors list.</p>
+            <button class="btn btn--ghost" id="grant-admin-btn">Grant Admin Access</button>` : `<p class="text-muted" style="margin-top:10px;">Only super admins can grant admin access.</p>`}
+        </div>`;
+
+      document.getElementById("save-settings-btn").addEventListener("click", async () => {
+        const errorBox = document.getElementById("settings-error");
+        const supportEmail = document.getElementById("supportEmail").value.trim();
+        if (!isValidEmail(supportEmail)) { errorBox.textContent = "Enter a valid support email."; return; }
+        errorBox.textContent = "";
+        try {
+          await createDocWithId(COLLECTIONS.PLATFORM_SETTINGS, SETTINGS_DOC_ID, {
+            bankName: document.getElementById("bankName").value.trim(),
+            accountTitle: document.getElementById("accountTitle").value.trim(),
+            accountNumber: document.getElementById("accountNumber").value.trim(),
+            supportEmail,
+            zeroSaleRefundFeePercent: Number(document.getElementById("zeroSaleFee").value),
+            earlyExitFeePercent: Number(document.getElementById("earlyExitFee").value),
+            stockPurchaseWindowDays: Number(document.getElementById("purchaseWindow").value),
+            updatedAt: serverTimestamp(),
+            updatedBy: session.user.uid
+          });
+          toast("Settings saved.", "success");
+        } catch (e) {
+          errorBox.textContent = "Could not save settings.";
+        }
+      });
+
+      if (isSuperAdmin && document.getElementById("grant-admin-btn")) {
+        document.getElementById("grant-admin-btn").addEventListener("click", async () => {
+          const uid = document.getElementById("new-admin-uid").value.trim();
+          if (!uid) { toast("Enter a valid user ID.", "warning"); return; }
+          const ok = await confirmModal("Grant full admin access to this user? They will be able to approve deposits, withdrawals, and manage the entire platform.", { title: "Grant Admin Access", danger: true });
+          if (!ok) return;
+          try {
+            await grantAdminRole(uid, session.user.uid);
+            toast("Admin access granted.", "success");
+            init();
+          } catch (e) { toast("Could not grant admin access. Check the user ID.", "error"); }
+        });
+      }
+    } catch (e) {
+      console.error(e);
+      page.innerHTML = errorHTML("Could not load platform settings.");
+    }
+  }
+
+  init();
+</script>
+</body>
+</html>

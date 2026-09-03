@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Investors — Admin — Hunny Invests</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/dashboard.css">
+<link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+<div id="app-shell"></div>
+
+<script type="module">
+  import { requireAuth } from "./js/guards.js";
+  import { renderAppShell, loadingHTML, errorHTML, emptyHTML, toast, confirmModal, openModal } from "./js/ui.js";
+  import { getAllUsersByRole, suspendUser, reactivateUser, grantOwnerRole } from "./js/admin.js";
+  import { getWallet } from "./js/wallet.js";
+  import { getUnreadCount } from "./js/notifications.js";
+  import { formatPKR, formatDate, escapeHTML, debounce } from "./js/utils.js";
+  import { getMany, COLLECTIONS, where } from "./js/firestore.js";
+
+  let users = [];
+  let profiles = {};
+
+  function render(filter = "") {
+    const list = users.filter((u) => !filter || (profiles[u.id]?.fullName || u.email || "").toLowerCase().includes(filter.toLowerCase()));
+    const container = document.getElementById("users-table");
+    if (!list.length) { container.innerHTML = emptyHTML("No investors found.", { icon: "👥" }); return; }
+    container.innerHTML = `
+      <div class="data-table-wrap"><table class="data-table">
+        <thead><tr><th>Name</th><th>Email</th><th>Status</th><th>Joined</th><th></th></tr></thead>
+        <tbody>${list.map(row).join("")}</tbody>
+      </table></div>
+      <div class="record-cards">${list.map(cardRow).join("")}</div>`;
+    wire();
+  }
+
+  function row(u) {
+    const p = profiles[u.id] || {};
+    return `<tr>
+      <td>${escapeHTML(p.fullName || "—")}</td><td>${escapeHTML(u.email)}</td>
+      <td><span class="badge ${u.status === "suspended" ? "badge--red" : "badge--green"}">${escapeHTML(u.status || "active")}</span></td>
+      <td>${formatDate(u.createdAt)}</td>
+      <td class="flex gap-8">
+        <button class="btn btn--ghost btn--sm view-wallet-btn" data-id="${u.id}">Wallet</button>
+        <button class="btn btn--ghost btn--sm grant-owner-btn" data-id="${u.id}">Make Owner</button>
+        ${u.status === "suspended"
+          ? `<button class="btn btn--ghost btn--sm reactivate-btn" data-id="${u.id}">Reactivate</button>`
+          : `<button class="btn btn--danger btn--sm suspend-btn" data-id="${u.id}">Suspend</button>`}
+      </td></tr>`;
+  }
+  function cardRow(u) {
+    const p = profiles[u.id] || {};
+    return `<div class="record-card">
+      <div class="record-card__top"><span class="record-card__title">${escapeHTML(p.fullName || u.email)}</span><span class="badge ${u.status === "suspended" ? "badge--red" : "badge--green"}">${escapeHTML(u.status || "active")}</span></div>
+      <div class="record-card__meta">${escapeHTML(u.email)} · Joined ${formatDate(u.createdAt)}</div>
+      <div class="record-card__actions">
+        <button class="btn btn--ghost btn--sm view-wallet-btn" data-id="${u.id}">Wallet</button>
+        <button class="btn btn--ghost btn--sm grant-owner-btn" data-id="${u.id}">Make Owner</button>
+        ${u.status === "suspended"
+          ? `<button class="btn btn--ghost btn--sm reactivate-btn" data-id="${u.id}">Reactivate</button>`
+          : `<button class="btn btn--danger btn--sm suspend-btn" data-id="${u.id}">Suspend</button>`}
+      </div>
+    </div>`;
+  }
+
+  function wire() {
+    document.querySelectorAll(".view-wallet-btn").forEach((btn) => btn.addEventListener("click", async () => {
+      const wallet = await getWallet(btn.dataset.id);
+      openModal(`
+        <h3 class="modal-title">Wallet Summary</h3>
+        <div class="kv-row"><span>Available</span><span class="money">${formatPKR(wallet?.availableBalance)}</span></div>
+        <div class="kv-row"><span>Locked</span><span>${formatPKR(wallet?.lockedBalance)}</span></div>
+        <div class="kv-row"><span>Total Deposited</span><span>${formatPKR(wallet?.totalDeposited)}</span></div>
+        <div class="kv-row"><span>Total Invested</span><span>${formatPKR(wallet?.totalInvested)}</span></div>
+        <div class="kv-row"><span>Total Profit</span><span>${formatPKR(wallet?.totalProfit)}</span></div>
+        <div class="kv-row"><span>Total Withdrawn</span><span>${formatPKR(wallet?.totalWithdrawn)}</span></div>
+        <div class="kv-row"><span>Total Refunded</span><span>${formatPKR(wallet?.totalRefunded)}</span></div>`);
+    }));
+    document.querySelectorAll(".grant-owner-btn").forEach((btn) => btn.addEventListener("click", async () => {
+      const ok = await confirmModal("Grant owner access to this user? They will be able to create investment opportunities.", { title: "Grant Owner Access" });
+      if (!ok) return;
+      await grantOwnerRole(btn.dataset.id, currentAdminId);
+      toast("Owner access granted.", "success");
+      load();
+    }));
+    document.querySelectorAll(".suspend-btn").forEach((btn) => btn.addEventListener("click", async () => {
+      const ok = await confirmModal("Suspend this user's account? They will be unable to log in.", { title: "Suspend User", danger: true });
+      if (!ok) return;
+      await suspendUser(btn.dataset.id, currentAdminId, "Suspended by admin");
+      toast("User suspended.", "success");
+      load();
+    }));
+    document.querySelectorAll(".reactivate-btn").forEach((btn) => btn.addEventListener("click", async () => {
+      await reactivateUser(btn.dataset.id, currentAdminId);
+      toast("User reactivated.", "success");
+      load();
+    }));
+  }
+
+  let currentAdminId;
+
+  async function load() {
+    const page = document.getElementById("page-content");
+    page.innerHTML = loadingHTML("Loading investors…");
+    try {
+      users = await getAllUsersByRole("investor");
+      const profileDocs = await getMany(COLLECTIONS.PROFILES);
+      profiles = Object.fromEntries(profileDocs.map((p) => [p.id, p]));
+      page.innerHTML = `<div class="form-group"><input class="input" id="search" placeholder="Search by name…"></div><div id="users-table"></div>`;
+      render();
+      document.getElementById("search").addEventListener("input", debounce((e) => render(e.target.value), 250));
+    } catch (e) {
+      console.error(e);
+      page.innerHTML = errorHTML("Could not load investors.");
+    }
+  }
+
+  async function init() {
+    const session = await requireAuth(["admin", "super_admin"]);
+    if (!session) return;
+    currentAdminId = session.user.uid;
+    const unreadCount = await getUnreadCount(session.user.uid);
+    renderAppShell({ role: "admin", active: "admin-users", title: "Investors", profile: session.profile, unreadCount });
+    load();
+  }
+
+  init();
+</script>
+</body>
+</html>

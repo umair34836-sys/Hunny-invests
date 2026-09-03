@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Record Sales — Hunny Invests</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/dashboard.css">
+<link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+<div id="app-shell"></div>
+
+<script type="module">
+  import { requireAuth } from "./js/guards.js";
+  import { renderAppShell, loadingHTML, errorHTML, emptyHTML, toast } from "./js/ui.js";
+  import { getOpportunity } from "./js/opportunities.js";
+  import { recordSale, getSalesForOpportunity } from "./js/sales.js";
+  import { getUnreadCount } from "./js/notifications.js";
+  import { formatPKR, formatDate, escapeHTML, getQueryParam } from "./js/utils.js";
+
+  const id = getQueryParam("id");
+
+  async function init() {
+    const session = await requireAuth(["owner"]);
+    if (!session) return;
+    const unreadCount = await getUnreadCount(session.user.uid);
+    const page = renderAppShell({ role: "owner", active: "owner-opportunities", title: "Record Sales", profile: session.profile, unreadCount });
+    page.innerHTML = loadingHTML("Loading…");
+
+    if (!id) { page.innerHTML = errorHTML("No opportunity specified."); return; }
+    const opp = await getOpportunity(id).catch(() => null);
+    if (!opp || opp.ownerId !== session.user.uid) { page.innerHTML = errorHTML("Opportunity not found."); return; }
+    const sales = await getSalesForOpportunity(id);
+
+    page.innerHTML = `
+      <a href="owner-opportunity.html?id=${id}" style="font-size:13px;">← Back to opportunity</a>
+      <div class="card" style="margin:14px 0;">
+        <div class="kv-row"><span>Remaining Stock</span><span>${opp.remainingQuantity} / ${opp.stockQuantity}</span></div>
+        <div class="kv-row"><span>Total Revenue</span><span class="money">${formatPKR(opp.revenueTotal)}</span></div>
+      </div>
+
+      ${["active", "matured"].includes(opp.status) ? `
+      <div class="card" style="margin-bottom:16px;">
+        <h3>Record a Sale</h3>
+        <div class="form-row form-row--2">
+          <div class="form-group"><label class="form-label">Quantity Sold</label><input class="input" type="number" id="sale-qty" min="1" max="${opp.remainingQuantity}"></div>
+          <div class="form-group"><label class="form-label">Sale Amount (PKR)</label><input class="input" type="number" id="sale-amount" min="0"></div>
+        </div>
+        <div class="form-group"><label class="form-label">Sale Date</label><input class="input" type="date" id="sale-date"></div>
+        <div class="form-group"><label class="form-label">Notes (optional)</label><input class="input" id="sale-notes" placeholder="e.g. Sold via Instagram order"></div>
+        <div class="form-error" id="sale-error"></div>
+        <button class="btn btn--primary" id="record-sale-btn">Record Sale</button>
+      </div>` : `<div class="alert alert--info">Sales can be recorded once the opportunity is active.</div>`}
+
+      <div class="dash-section__head"><h2>Sales History</h2></div>
+      <div id="sales-list"></div>`;
+
+    document.getElementById("sales-list").innerHTML = sales.length ? `
+      <div class="data-table-wrap"><table class="data-table">
+        <thead><tr><th>Date</th><th>Quantity</th><th>Amount</th><th>Notes</th></tr></thead>
+        <tbody>${sales.map((s) => `<tr><td>${formatDate(s.saleDate)}</td><td>${s.quantity}</td><td class="money">${formatPKR(s.saleAmount)}</td><td>${escapeHTML(s.notes || "")}</td></tr>`).join("")}</tbody>
+      </table></div>
+      <div class="record-cards">${sales.map((s) => `<div class="record-card"><div class="record-card__top"><span class="record-card__title">${s.quantity} unit(s)</span><span class="money">${formatPKR(s.saleAmount)}</span></div><div class="record-card__meta">${formatDate(s.saleDate)}</div></div>`).join("")}</div>`
+      : emptyHTML("No sales recorded yet.", { icon: "🛒" });
+
+    if (document.getElementById("record-sale-btn")) {
+      document.getElementById("record-sale-btn").addEventListener("click", async () => {
+        const quantity = Number(document.getElementById("sale-qty").value);
+        const saleAmount = Number(document.getElementById("sale-amount").value);
+        const saleDate = document.getElementById("sale-date").value;
+        const notes = document.getElementById("sale-notes").value.trim();
+        const errorBox = document.getElementById("sale-error");
+        if (!(quantity > 0) || !(saleAmount >= 0)) { errorBox.textContent = "Enter a valid quantity and amount."; return; }
+        try {
+          await recordSale(id, session.user.uid, { quantity, saleAmount, saleDate, notes });
+          toast("Sale recorded.", "success");
+          init();
+        } catch (e) { errorBox.textContent = e.message || "Could not record sale."; }
+      });
+    }
+  }
+
+  init();
+</script>
+</body>
+</html>

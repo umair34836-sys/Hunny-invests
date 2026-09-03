@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard — Hunny Invests</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/dashboard.css">
+<link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+<div id="app-shell"></div>
+
+<script type="module">
+  import { requireAuth } from "./js/guards.js";
+  import { renderAppShell, toast, loadingHTML, emptyHTML, errorHTML, statusBadge, progressBar, skeletonCards } from "./js/ui.js";
+  import { getWallet } from "./js/wallet.js";
+  import { getInvestorInvestments } from "./js/investments.js";
+  import { getUnreadCount } from "./js/notifications.js";
+  import { formatPKR } from "./js/utils.js";
+
+  async function init() {
+    const session = await requireAuth(["investor"]);
+    if (!session) return;
+    const unreadCount = await getUnreadCount(session.user.uid);
+    const page = renderAppShell({ role: "investor", active: "dashboard", title: "Dashboard", profile: session.profile, unreadCount });
+    page.innerHTML = loadingHTML("Loading your dashboard…");
+
+    try {
+      const [wallet, investments] = await Promise.all([
+        getWallet(session.user.uid),
+        getInvestorInvestments(session.user.uid, 6)
+      ]);
+
+      const activeCount = investments.filter((i) => ["invested", "active"].includes(i.status)).length;
+
+      page.innerHTML = `
+        <div class="stat-grid">
+          <div class="stat-card stat-card--accent"><div class="stat-card__label">👛 Available Wallet</div><div class="stat-card__value">${formatPKR(wallet?.availableBalance)}</div></div>
+          <div class="stat-card"><div class="stat-card__label">🔒 Locked Investments</div><div class="stat-card__value">${formatPKR(wallet?.lockedBalance)}</div></div>
+          <div class="stat-card"><div class="stat-card__label">💼 Total Invested</div><div class="stat-card__value">${formatPKR(wallet?.totalInvested)}</div></div>
+          <div class="stat-card"><div class="stat-card__label">📈 Realized Profit</div><div class="stat-card__value">${formatPKR(wallet?.totalProfit)}</div></div>
+          <div class="stat-card"><div class="stat-card__label">⬆️ Total Withdrawn</div><div class="stat-card__value">${formatPKR(wallet?.totalWithdrawn)}</div></div>
+          <div class="stat-card"><div class="stat-card__label">↩️ Total Refunded</div><div class="stat-card__value">${formatPKR(wallet?.totalRefunded)}</div></div>
+          <div class="stat-card"><div class="stat-card__label">📊 Active Opportunities</div><div class="stat-card__value">${activeCount}</div></div>
+          <div class="stat-card"><div class="stat-card__label">💰 Total Deposited</div><div class="stat-card__value">${formatPKR(wallet?.totalDeposited)}</div></div>
+        </div>
+
+        <div class="dash-section">
+          <div class="dash-section__head"><h2>Quick Actions</h2></div>
+          <div class="flex gap-12 flex-wrap">
+            <a href="deposit.html" class="btn btn--primary">Deposit Funds</a>
+            <a href="opportunities.html" class="btn btn--ghost">Browse Opportunities</a>
+            <a href="withdraw.html" class="btn btn--ghost">Withdraw</a>
+          </div>
+        </div>
+
+        <div class="dash-section">
+          <div class="dash-section__head"><h2>Recent Investments</h2><a href="investments.html" style="font-size:13px;">View all →</a></div>
+          <div id="recent-investments">${investments.length ? "" : emptyHTML("You haven't invested yet.", { icon: "💼", actionHTML: '<a href="opportunities.html" class="btn btn--primary btn--sm">Browse Opportunities</a>' })}</div>
+        </div>`;
+
+      if (investments.length) {
+        document.getElementById("recent-investments").innerHTML = investments.map((inv) => `
+          <div class="investment-card">
+            <div class="investment-card__head">
+              <div><strong>${inv.opportunityTitle || "Opportunity"}</strong><div class="text-muted" style="font-size:12px;">Invested ${formatPKR(inv.investedAmount)}</div></div>
+              ${statusBadge(inv.status)}
+            </div>
+            <div class="investment-card__figures">
+              <div class="investment-card__figure"><span>Return</span><strong>${inv.investorReturnPercent}%</strong></div>
+              <div class="investment-card__figure"><span>Expected Profit</span><strong>${formatPKR(inv.expectedProfit)}</strong></div>
+              <div class="investment-card__figure"><span>Maturity Payout</span><strong>${formatPKR(inv.expectedMaturityAmount)}</strong></div>
+              <div class="investment-card__figure"><span>Stock Share</span><strong>${inv.stockSharePercent}%</strong></div>
+            </div>
+            <a href="investment.html?id=${inv.id}" class="btn btn--ghost btn--sm btn--block">View Details</a>
+          </div>`).join("");
+      }
+    } catch (e) {
+      console.error(e);
+      page.innerHTML = errorHTML("Could not load your dashboard.");
+    }
+  }
+
+  init();
+</script>
+</body>
+</html>

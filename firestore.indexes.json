@@ -1,0 +1,77 @@
+{
+  "indexes": [
+    { "collectionGroup": "depositRequests", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "userId", "order": "ASCENDING" },
+      { "fieldPath": "requestedAt", "order": "DESCENDING" }
+    ]},
+    { "collectionGroup": "depositRequests", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "status", "order": "ASCENDING" },
+      { "fieldPath": "requestedAt", "order": "ASCENDING" }
+    ]},
+    { "collectionGroup": "withdrawalRequests", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "userId", "order": "ASCENDING" },
+      { "fieldPath": "requestedAt", "order": "DESCENDING" }
+    ]},
+    { "collectionGroup": "withdrawalRequests", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "status", "order": "ASCENDING" },
+      { "fieldPath": "requestedAt", "order": "ASCENDING" }
+    ]},
+    { "collectionGroup": "withdrawalRequests", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "userId", "order": "ASCENDING" },
+      { "fieldPath": "status", "order": "ASCENDING" }
+    ]},
+    { "collectionGroup": "walletTransactions", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "userId", "order": "ASCENDING" },
+      { "fieldPath": "createdAt", "order": "DESCENDING" }
+    ]},
+    { "collectionGroup": "investments", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "investorId", "order": "ASCENDING" },
+      { "fieldPath": "investedAt", "order": "DESCENDING" }
+    ]},
+    { "collectionGroup": "investments", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "opportunityId", "order": "ASCENDING" },
+      { "fieldPath": "investedAmount", "order": "DESCENDING" }
+    ]},
+    { "collectionGroup": "investments", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "opportunityId", "order": "ASCENDING" },
+      { "fieldPath": "status", "order": "ASCENDING" }
+    ]},
+    { "collectionGroup": "opportunities", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "status", "order": "ASCENDING" },
+      { "fieldPath": "createdAt", "order": "DESCENDING" }
+    ]},
+    { "collectionGroup": "opportunities", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "status", "order": "ASCENDING" },
+      { "fieldPath": "fundingDeadline", "order": "ASCENDING" }
+    ]},
+    { "collectionGroup": "opportunities", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "ownerId", "order": "ASCENDING" },
+      { "fieldPath": "createdAt", "order": "DESCENDING" }
+    ]},
+    { "collectionGroup": "notifications", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "userId", "order": "ASCENDING" },
+      { "fieldPath": "createdAt", "order": "DESCENDING" }
+    ]},
+    { "collectionGroup": "notifications", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "userId", "order": "ASCENDING" },
+      { "fieldPath": "read", "order": "ASCENDING" }
+    ]},
+    { "collectionGroup": "users", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "role", "order": "ASCENDING" },
+      { "fieldPath": "createdAt", "order": "DESCENDING" }
+    ]},
+    { "collectionGroup": "sales", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "opportunityId", "order": "ASCENDING" },
+      { "fieldPath": "createdAt", "order": "DESCENDING" }
+    ]},
+    { "collectionGroup": "expenses", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "opportunityId", "order": "ASCENDING" },
+      { "fieldPath": "createdAt", "order": "DESCENDING" }
+    ]},
+    { "collectionGroup": "stockItems", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "opportunityId", "order": "ASCENDING" },
+      { "fieldPath": "createdAt", "order": "DESCENDING" }
+    ]}
+  ],
+  "fieldOverrides": []
+}

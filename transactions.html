@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Transactions — Hunny Invests</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/dashboard.css">
+<link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+<div id="app-shell"></div>
+
+<script type="module">
+  import { requireAuth } from "./js/guards.js";
+  import { renderAppShell, loadingHTML, emptyHTML, errorHTML } from "./js/ui.js";
+  import { getUserWalletTransactions } from "./js/wallet.js";
+  import { getUnreadCount } from "./js/notifications.js";
+  import { formatPKR, formatDateTime, escapeHTML } from "./js/utils.js";
+
+  const TYPE_LABELS = {
+    deposit_pending: "Deposit (Pending)", deposit_approved: "Deposit Approved", investment: "Investment",
+    early_exit_fee: "Early Exit", refund: "Refund", profit: "Profit Credited",
+    withdrawal_pending: "Withdrawal (Pending)", withdrawal_approved: "Withdrawal Approved",
+    withdrawal_rejected: "Withdrawal Rejected", adjustment: "Adjustment", reversal: "Reversal"
+  };
+
+  async function init() {
+    const session = await requireAuth(["investor"]);
+    if (!session) return;
+    const unreadCount = await getUnreadCount(session.user.uid);
+    const page = renderAppShell({ role: "investor", active: "transactions", title: "Transaction History", profile: session.profile, unreadCount });
+    page.innerHTML = loadingHTML("Loading transactions…");
+
+    try {
+      const txs = await getUserWalletTransactions(session.user.uid, 200);
+      if (!txs.length) { page.innerHTML = emptyHTML("No transactions yet.", { icon: "🧾" }); return; }
+
+      page.innerHTML = `
+        <div class="data-table-wrap">
+          <table class="data-table">
+            <thead><tr><th>Date</th><th>Type</th><th>Amount</th><th>Description</th></tr></thead>
+            <tbody>${txs.map((t) => `<tr><td>${formatDateTime(t.createdAt)}</td><td>${TYPE_LABELS[t.type] || t.type}</td><td class="money">${formatPKR(t.amount)}</td><td>${escapeHTML(t.description || "")}</td></tr>`).join("")}</tbody>
+          </table>
+        </div>
+        <div class="record-cards">${txs.map((t) => `
+          <div class="record-card">
+            <div class="record-card__top"><span class="record-card__title">${formatPKR(t.amount)}</span><span class="pill-tag">${TYPE_LABELS[t.type] || t.type}</span></div>
+            <div class="record-card__meta">${formatDateTime(t.createdAt)}</div>
+            <p style="font-size:12.5px;margin:6px 0 0;">${escapeHTML(t.description || "")}</p>
+          </div>`).join("")}</div>`;
+    } catch (e) {
+      console.error(e);
+      page.innerHTML = errorHTML("Could not load your transactions.");
+    }
+  }
+
+  init();
+</script>
+</body>
+</html>

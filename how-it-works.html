@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>How It Works — Hunny Invests</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+<header id="site-header"></header>
+
+<main class="section container">
+  <div class="section-head">
+    <span class="eyebrow">Guide</span>
+    <h1>How Hunny Invests Works</h1>
+    <p>From deposit to payout — here's exactly what happens at every stage.</p>
+  </div>
+
+  <div class="steps">
+    <div class="step"><div class="step__num">1</div><div><h3>Deposit into your wallet</h3><p>Create an account, then request a deposit. We'll show you payment instructions — send funds and share your reference with our admin team. Once verified, your available wallet balance increases.</p></div></div>
+    <div class="step"><div class="step__num">2</div><div><h3>Browse opportunities</h3><p>Each opportunity shows the product, required capital, funding progress, advertised return, duration, and minimum/maximum investment — before you commit anything.</p></div></div>
+    <div class="step"><div class="step__num">3</div><div><h3>Invest from your wallet</h3><p>Enter an amount, preview your expected return and maturity payout, and confirm. The amount moves from your available balance to a locked investment balance.</p></div></div>
+    <div class="step"><div class="step__num">4</div><div><h3>Funding reaches 100%</h3><p>Once an opportunity is fully funded, the owner is notified and can purchase the required stock — this must happen within the opportunity's stock purchase window.</p></div></div>
+    <div class="step"><div class="step__num">5</div><div><h3>Stock purchased — timer starts</h3><p>When the owner confirms the stock purchase, the investment period officially begins. Your maturity date is set from this point, not from when you invested.</p></div></div>
+    <div class="step"><div class="step__num">6</div><div><h3>Sales are tracked</h3><p>The owner manually records sales and remaining stock throughout the investment period. You can follow progress from your investment detail page.</p></div></div>
+    <div class="step"><div class="step__num">7</div><div><h3>Maturity &amp; settlement</h3><p>At maturity: if at least one unit sold, you receive your principal plus the advertised return. If zero units sold, you receive your principal minus a 1% fee.</p></div></div>
+    <div class="step"><div class="step__num">8</div><div><h3>Withdraw anytime</h3><p>Once funds are back in your available balance, request a withdrawal. Our admin team verifies and processes it, typically within 24 hours.</p></div></div>
+  </div>
+
+  <div class="card" style="margin-top:36px;">
+    <h3>What if the owner never purchases stock?</h3>
+    <p>If the stock purchase deadline passes without the owner buying stock, every investor is refunded in full — with <strong>no</strong> early-exit fee.</p>
+  </div>
+  <div class="card" style="margin-top:16px;">
+    <h3>Can I exit early?</h3>
+    <p>Yes — but only before the investment period starts (i.e. before the owner purchases stock). A 2% fee applies. Once the timer starts, funds are locked until maturity.</p>
+  </div>
+
+  <div class="text-center" style="margin-top:32px;">
+    <a href="opportunities.html" class="btn btn--primary btn--lg">Browse Opportunities</a>
+  </div>
+</main>
+
+<footer id="site-footer"></footer>
+
+<script type="module">
+  import { renderPublicNav } from "./js/ui.js";
+  import { getOptionalSession } from "./js/guards.js";
+  (async () => renderPublicNav("how-it-works", await getOptionalSession()))();
+</script>
+</body>
+</html>

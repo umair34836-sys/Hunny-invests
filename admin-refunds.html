@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Refunds — Admin — Hunny Invests</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/dashboard.css">
+<link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+<div id="app-shell"></div>
+
+<script type="module">
+  import { requireAuth } from "./js/guards.js";
+  import { renderAppShell, loadingHTML, errorHTML, emptyHTML, statusBadge, toast, confirmModal } from "./js/ui.js";
+  import { listOpportunitiesByStatus } from "./js/opportunities.js";
+  import { adminProcessDeadlineRefund, getAllSettlements } from "./js/settlements.js";
+  import { getUnreadCount } from "./js/notifications.js";
+  import { formatPKR, formatDate, escapeHTML } from "./js/utils.js";
+
+  let currentAdminId;
+
+  async function load() {
+    const page = document.getElementById("page-content");
+    page.innerHTML = loadingHTML("Loading refunds…");
+    try {
+      const [awaitingPurchase, refundPending, settlements] = await Promise.all([
+        listOpportunitiesByStatus("awaiting_stock_purchase"),
+        listOpportunitiesByStatus("refund_pending"),
+        getAllSettlements()
+      ]);
+      const deadlineRefunds = settlements.filter((s) => s.type === "deadline_refund");
+      const now = new Date();
+      const overdue = awaitingPurchase.filter((o) => o.stockPurchaseDeadline && new Date(o.stockPurchaseDeadline.toDate ? o.stockPurchaseDeadline.toDate() : o.stockPurchaseDeadline) < now);
+
+      page.innerHTML = `
+        <div class="dash-section">
+          <div class="dash-section__head"><h2>Overdue Stock Purchase (Refund Required)</h2></div>
+          <div id="overdue-list">${overdue.length ? overdue.map((o) => `
+            <div class="record-card">
+              <div class="record-card__top"><span class="record-card__title">${escapeHTML(o.title)}</span><span class="badge badge--red">Deadline Passed</span></div>
+              <div class="record-card__meta">Deadline was ${formatDate(o.stockPurchaseDeadline)} · ${formatPKR(o.fundedAmount)} funded</div>
+              <div class="record-card__actions"><button class="btn btn--danger btn--sm refund-btn" data-id="${o.id}">Process Full Refund</button></div>
+            </div>`).join("") : emptyHTML("No overdue opportunities right now.", { icon: "✅" })}</div>
+        </div>
+
+        <div class="dash-section">
+          <div class="dash-section__head"><h2>Refund History</h2></div>
+          <div>${deadlineRefunds.length ? `
+            <div class="data-table-wrap"><table class="data-table">
+              <thead><tr><th>Opportunity</th><th>Investors</th><th>Total Refunded</th><th>Processed</th></tr></thead>
+              <tbody>${deadlineRefunds.map((s) => `<tr><td>${s.opportunityId}</td><td>${s.investorCount}</td><td class="money">${formatPKR(s.totalPayout)}</td><td>${s.processedAt ? formatDate(s.processedAt) : "—"}</td></tr>`).join("")}</tbody>
+            </table></div>` : emptyHTML("No refunds processed yet.", { icon: "↩️" })}</div>
+        </div>`;
+
+      document.querySelectorAll(".refund-btn").forEach((btn) => btn.addEventListener("click", async () => {
+        const ok = await confirmModal("Refund all investors in this opportunity in full (no fee)? This cannot be undone.", { title: "Process Deadline Refund", danger: true });
+        if (!ok) return;
+        try { await adminProcessDeadlineRefund(btn.dataset.id, currentAdminId); toast("Refund processed.", "success"); load(); }
+        catch (e) { toast(e.message || "Could not process refund.", "error"); }
+      }));
+    } catch (e) {
+      console.error(e);
+      page.innerHTML = errorHTML("Could not load refunds.");
+    }
+  }
+
+  async function init() {
+    const session = await requireAuth(["admin", "super_admin"]);
+    if (!session) return;
+    currentAdminId = session.user.uid;
+    const unreadCount = await getUnreadCount(session.user.uid);
+    renderAppShell({ role: "admin", active: "admin-refunds", title: "Refunds", profile: session.profile, unreadCount });
+    load();
+  }
+
+  init();
+</script>
+</body>
+</html>
