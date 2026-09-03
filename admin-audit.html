@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Audit Logs — Admin — Hunny Invests</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/dashboard.css">
+<link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+<div id="app-shell"></div>
+
+<script type="module">
+  import { requireAuth } from "./js/guards.js";
+  import { renderAppShell, loadingHTML, errorHTML, emptyHTML } from "./js/ui.js";
+  import { getAuditLogs } from "./js/admin.js";
+  import { getUnreadCount } from "./js/notifications.js";
+  import { formatDateTime, escapeHTML, debounce } from "./js/utils.js";
+
+  let all = [];
+  function render(filter = "") {
+    const list = filter ? all.filter((a) => a.action.includes(filter) || (a.entityType || "").includes(filter)) : all;
+    const el = document.getElementById("audit-table");
+    if (!list.length) { el.innerHTML = emptyHTML("No audit records found."); return; }
+    el.innerHTML = `
+      <div class="data-table-wrap"><table class="data-table">
+        <thead><tr><th>Date</th><th>Actor</th><th>Action</th><th>Entity</th><th>Reason</th></tr></thead>
+        <tbody>${list.map((a) => `<tr><td>${formatDateTime(a.timestamp)}</td><td style="font-size:11px;color:var(--color-text-faint);">${(a.actorId || "").slice(0, 8)}… (${a.actorRole || "—"})</td><td>${escapeHTML(a.action)}</td><td>${escapeHTML(a.entityType || "")} ${a.entityId ? "#" + a.entityId.slice(0, 6) : ""}</td><td>${escapeHTML(a.reason || "")}</td></tr>`).join("")}</tbody>
+      </table></div>
+      <div class="record-cards">${list.map((a) => `<div class="record-card">
+        <div class="record-card__top"><span class="record-card__title">${escapeHTML(a.action)}</span></div>
+        <div class="record-card__meta">${formatDateTime(a.timestamp)} · ${escapeHTML(a.actorRole || "")}</div>
+      </div>`).join("")}</div>`;
+  }
+
+  async function init() {
+    const session = await requireAuth(["admin", "super_admin"]);
+    if (!session) return;
+    const unreadCount = await getUnreadCount(session.user.uid);
+    const page = renderAppShell({ role: "admin", active: "admin-audit", title: "Audit Logs", profile: session.profile, unreadCount });
+    page.innerHTML = loadingHTML("Loading audit logs…");
+    try {
+      all = await getAuditLogs(500);
+      page.innerHTML = `<div class="form-group"><input class="input" id="search" placeholder="Filter by action or entity type…"></div><div id="audit-table"></div>`;
+      render();
+      document.getElementById("search").addEventListener("input", debounce((e) => render(e.target.value), 250));
+    } catch (e) {
+      console.error(e);
+      page.innerHTML = errorHTML("Could not load audit logs.");
+    }
+  }
+
+  init();
+</script>
+</body>
+</html>

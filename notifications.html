@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Notifications — Hunny Invests</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/dashboard.css">
+<link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+<div id="app-shell"></div>
+
+<script type="module">
+  import { requireAuth, isAdminRole } from "./js/guards.js";
+  import { renderAppShell, loadingHTML, emptyHTML, errorHTML, toast } from "./js/ui.js";
+  import { getUserNotifications, getUnreadCount, markNotificationRead, markAllRead } from "./js/notifications.js";
+  import { formatDateTime, escapeHTML } from "./js/utils.js";
+
+  const TYPE_ICON = {
+    deposit_approved: "⬇️", deposit_rejected: "⚠️", investment_successful: "💼", opportunity_fully_funded: "🎉",
+    opportunity_approved: "✅", opportunity_rejected: "⛔", opportunity_frozen: "🧊", new_investment: "📈",
+    investment_started: "⏱️", profit_credited: "💰", refund_processed: "↩️", withdrawal_approved: "⬆️",
+    withdrawal_rejected: "⚠️", early_exit_processed: "🚪", settlement_required: "⚖️", settlement_completed: "✅",
+    owner_approved: "🏭", owner_revoked: "🚫", opportunity_pending_review: "📝", opportunity_cancelled: "🛑"
+  };
+
+  async function init() {
+    const session = await requireAuth(["investor", "owner", "admin", "super_admin"]);
+    if (!session) return;
+    const role = session.userRecord.role;
+    const shellRole = isAdminRole(role) ? "admin" : role;
+    const unreadCount = await getUnreadCount(session.user.uid);
+    const page = renderAppShell({ role: shellRole, active: "notifications", title: "Notifications", profile: session.profile, unreadCount });
+    page.innerHTML = loadingHTML("Loading notifications…");
+
+    try {
+      const notifs = await getUserNotifications(session.user.uid);
+      if (!notifs.length) { page.innerHTML = emptyHTML("You have no notifications yet.", { icon: "🔔" }); return; }
+
+      page.innerHTML = `
+        <div class="flex-between" style="margin-bottom:14px;">
+          <p class="text-muted mb-0">${notifs.filter((n) => !n.read).length} unread</p>
+          <button class="btn btn--ghost btn--sm" id="mark-all-btn">Mark all as read</button>
+        </div>
+        <div id="notif-list">${notifs.map(notifRow).join("")}</div>`;
+
+      document.getElementById("mark-all-btn").addEventListener("click", async () => {
+        await markAllRead(session.user.uid);
+        toast("All notifications marked as read.", "success");
+        init();
+      });
+      document.querySelectorAll("[data-notif-id]").forEach((el) => el.addEventListener("click", async () => {
+        const id = el.dataset.notifId;
+        const link = el.dataset.link;
+        await markNotificationRead(id);
+        if (link) window.location.href = link;
+        else init();
+      }));
+    } catch (e) {
+      console.error(e);
+      page.innerHTML = errorHTML("Could not load notifications.");
+    }
+  }
+
+  function notifRow(n) {
+    const icon = TYPE_ICON[n.type] || "🔔";
+    return `<div class="notif-item ${n.read ? "" : "notif-item--unread"}" data-notif-id="${n.id}" ${n.link ? `data-link="${escapeHTML(n.link)}"` : ""} style="cursor:pointer;">
+      <div class="notif-item__icon">${icon}</div>
+      <div>
+        <div class="notif-item__title">${escapeHTML(n.title)}</div>
+        <div class="notif-item__msg">${escapeHTML(n.message)}</div>
+        <div class="notif-item__time">${formatDateTime(n.createdAt)}</div>
+      </div>
+    </div>`;
+  }
+
+  init();
+</script>
+</body>
+</html>

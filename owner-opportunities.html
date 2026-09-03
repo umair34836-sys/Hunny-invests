@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Opportunities — Hunny Invests</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/dashboard.css">
+<link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+<div id="app-shell"></div>
+
+<script type="module">
+  import { requireAuth } from "./js/guards.js";
+  import { renderAppShell, loadingHTML, emptyHTML, errorHTML, statusBadge, progressBar } from "./js/ui.js";
+  import { listOwnerOpportunities } from "./js/opportunities.js";
+  import { getUnreadCount } from "./js/notifications.js";
+  import { formatPKR, escapeHTML } from "./js/utils.js";
+  import { calculateFundingProgress } from "./js/calculations.js";
+
+  const FILTERS = ["all", "draft", "pending_review", "funding", "awaiting_stock_purchase", "active", "matured", "settlement_pending", "completed"];
+  let all = []; let currentFilter = "all";
+
+  function render() {
+    const list = currentFilter === "all" ? all : all.filter((o) => o.status === currentFilter);
+    const container = document.getElementById("opp-table");
+    if (!list.length) { container.innerHTML = emptyHTML("No opportunities in this status.", { icon: "📦" }); return; }
+    container.innerHTML = `
+      <div class="data-table-wrap"><table class="data-table">
+        <thead><tr><th>Title</th><th>Status</th><th>Funding</th><th>Return</th><th>Duration</th><th></th></tr></thead>
+        <tbody>${list.map(row).join("")}</tbody>
+      </table></div>
+      <div class="record-cards">${list.map(cardRow).join("")}</div>`;
+  }
+  function row(o) {
+    const progress = calculateFundingProgress(o.fundedAmount, o.requiredCapital);
+    return `<tr><td>${escapeHTML(o.title)}</td><td>${statusBadge(o.status)}</td><td style="min-width:140px;">${progressBar(progress)}</td><td>${o.investorReturnPercent}%</td><td>${o.durationMonths}mo</td><td><a class="btn btn--ghost btn--sm" href="owner-opportunity.html?id=${o.id}">Manage</a></td></tr>`;
+  }
+  function cardRow(o) {
+    const progress = calculateFundingProgress(o.fundedAmount, o.requiredCapital);
+    return `<div class="record-card">
+      <div class="record-card__top"><span class="record-card__title">${escapeHTML(o.title)}</span>${statusBadge(o.status)}</div>
+      ${progressBar(progress)}
+      <div class="record-card__grid"><div><span>Return</span>${o.investorReturnPercent}%</div><div><span>Duration</span>${o.durationMonths}mo</div></div>
+      <div class="record-card__actions"><a class="btn btn--ghost btn--sm btn--block" href="owner-opportunity.html?id=${o.id}">Manage</a></div>
+    </div>`;
+  }
+
+  async function init() {
+    const session = await requireAuth(["owner"]);
+    if (!session) return;
+    const unreadCount = await getUnreadCount(session.user.uid);
+    const page = renderAppShell({ role: "owner", active: "owner-opportunities", title: "My Opportunities", profile: session.profile, unreadCount });
+    page.innerHTML = loadingHTML("Loading…");
+
+    try {
+      all = await listOwnerOpportunities(session.user.uid);
+      page.innerHTML = `
+        <div class="tabs">${FILTERS.map((f) => `<button class="tab-btn ${f === "all" ? "active" : ""}" data-f="${f}">${f.replace(/_/g, " ")}</button>`).join("")}</div>
+        <div id="opp-table"></div>`;
+      render();
+      document.querySelectorAll(".tab-btn").forEach((btn) => btn.addEventListener("click", () => {
+        document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        currentFilter = btn.dataset.f;
+        render();
+      }));
+    } catch (e) {
+      console.error(e);
+      page.innerHTML = errorHTML("Could not load your opportunities.");
+    }
+  }
+
+  init();
+</script>
+</body>
+</html>

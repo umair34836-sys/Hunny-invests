@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Withdrawals — Admin — Hunny Invests</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/dashboard.css">
+<link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+<div id="app-shell"></div>
+
+<script type="module">
+  import { requireAuth } from "./js/guards.js";
+  import { renderAppShell, loadingHTML, errorHTML, emptyHTML, statusBadge, toast, confirmModal, promptModal } from "./js/ui.js";
+  import { getAllWithdrawals, approveWithdrawal, rejectWithdrawal } from "./js/admin.js";
+  import { getUnreadCount } from "./js/notifications.js";
+  import { formatPKR, formatDateTime, escapeHTML } from "./js/utils.js";
+
+  let currentAdminId; let all = [];
+
+  function render(filter = "pending") {
+    const list = filter === "all" ? all : all.filter((d) => d.status === filter);
+    const el = document.getElementById("wd-list");
+    if (!list.length) { el.innerHTML = emptyHTML("No withdrawal requests here."); return; }
+    el.innerHTML = `
+      <div class="data-table-wrap"><table class="data-table">
+        <thead><tr><th>Amount</th><th>Method</th><th>Account</th><th>Status</th><th>Requested</th><th></th></tr></thead>
+        <tbody>${list.map(row).join("")}</tbody>
+      </table></div>
+      <div class="record-cards">${list.map(cardRow).join("")}</div>`;
+    wire();
+  }
+  function actions(d) {
+    return d.status === "pending" ? `<button class="btn btn--primary btn--sm approve-btn" data-id="${d.id}">Mark Paid</button><button class="btn btn--danger btn--sm reject-btn" data-id="${d.id}">Reject</button>` : "";
+  }
+  function row(d) {
+    return `<tr><td class="money">${formatPKR(d.amount)}</td><td>${escapeHTML(d.paymentMethod || "")}</td><td>${escapeHTML(d.accountTitle || "")} — ${escapeHTML(d.accountNumber || "")}</td><td>${statusBadge(d.status)}</td><td>${formatDateTime(d.requestedAt)}</td><td class="flex gap-8">${actions(d)}</td></tr>`;
+  }
+  function cardRow(d) {
+    return `<div class="record-card">
+      <div class="record-card__top"><span class="record-card__title money">${formatPKR(d.amount)}</span>${statusBadge(d.status)}</div>
+      <div class="record-card__meta">${escapeHTML(d.paymentMethod || "")} · ${formatDateTime(d.requestedAt)}</div>
+      <p style="font-size:12.5px;margin:6px 0;">${escapeHTML(d.accountTitle || "")} — ${escapeHTML(d.accountNumber || "")}</p>
+      <div class="record-card__actions">${actions(d)}</div>
+    </div>`;
+  }
+
+  function wire() {
+    document.querySelectorAll(".approve-btn").forEach((btn) => btn.addEventListener("click", async () => {
+      const ok = await confirmModal("Confirm you have sent payment to the investor before marking this as paid.", { title: "Approve Withdrawal" });
+      if (!ok) return;
+      try { await approveWithdrawal(btn.dataset.id, currentAdminId); toast("Withdrawal approved.", "success"); load(); }
+      catch (e) { toast(e.message || "Could not approve withdrawal.", "error"); }
+    }));
+    document.querySelectorAll(".reject-btn").forEach((btn) => btn.addEventListener("click", async () => {
+      const reason = await promptModal("Why is this withdrawal being rejected?", { title: "Reject Withdrawal", required: true, confirmText: "Reject" });
+      if (reason === null) return;
+      try { await rejectWithdrawal(btn.dataset.id, currentAdminId, reason); toast("Withdrawal rejected.", "success"); load(); }
+      catch (e) { toast(e.message || "Could not reject withdrawal.", "error"); }
+    }));
+  }
+
+  async function load() {
+    const page = document.getElementById("page-content");
+    page.innerHTML = loadingHTML("Loading withdrawals…");
+    try {
+      all = await getAllWithdrawals();
+      page.innerHTML = `
+        <div class="tabs">
+          <button class="tab-btn active" data-f="pending">Pending</button>
+          <button class="tab-btn" data-f="approved">Approved</button>
+          <button class="tab-btn" data-f="rejected">Rejected</button>
+          <button class="tab-btn" data-f="all">All</button>
+        </div>
+        <div id="wd-list"></div>`;
+      render("pending");
+      document.querySelectorAll(".tab-btn").forEach((btn) => btn.addEventListener("click", () => {
+        document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active"); render(btn.dataset.f);
+      }));
+    } catch (e) {
+      console.error(e);
+      page.innerHTML = errorHTML("Could not load withdrawals.");
+    }
+  }
+
+  async function init() {
+    const session = await requireAuth(["admin", "super_admin"]);
+    if (!session) return;
+    currentAdminId = session.user.uid;
+    const unreadCount = await getUnreadCount(session.user.uid);
+    renderAppShell({ role: "admin", active: "admin-withdrawals", title: "Withdrawals", profile: session.profile, unreadCount });
+    load();
+  }
+
+  init();
+</script>
+</body>
+</html>

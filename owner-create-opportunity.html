@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Create Opportunity — Hunny Invests</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/dashboard.css">
+<link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+<div id="app-shell"></div>
+
+<script type="module">
+  import { requireAuth } from "./js/guards.js";
+  import { renderAppShell, toast } from "./js/ui.js";
+  import { createOpportunityDraft, submitForReview } from "./js/opportunities.js";
+  import { getUnreadCount } from "./js/notifications.js";
+  import { isNonEmpty, isPositiveNumber, validateForm } from "./js/validators.js";
+
+  async function init() {
+    const session = await requireAuth(["owner"]);
+    if (!session) return;
+    const unreadCount = await getUnreadCount(session.user.uid);
+    const page = renderAppShell({ role: "owner", active: "owner-create-opportunity", title: "Create Opportunity", profile: session.profile, unreadCount });
+
+    page.innerHTML = `
+      <div class="card">
+        <h3>Basic Information</h3>
+        <div class="form-group"><label class="form-label">Title</label><input class="input" id="title" placeholder="e.g. Women's Dresses — Batch #001"></div>
+        <div class="form-row form-row--2">
+          <div class="form-group"><label class="form-label">Category</label>
+            <select class="input" id="category">
+              <option value="apparel">Apparel</option>
+              <option value="electronics">Electronics</option>
+              <option value="groceries">Groceries</option>
+              <option value="cosmetics">Cosmetics</option>
+              <option value="general">General</option>
+            </select>
+          </div>
+          <div class="form-group"><label class="form-label">Image URL (optional)</label><input class="input" id="imageUrl" placeholder="https://…"></div>
+        </div>
+        <div class="form-group"><label class="form-label">Description</label><textarea class="input" id="description" rows="3" placeholder="Describe the opportunity for investors…"></textarea></div>
+      </div>
+
+      <div class="card" style="margin-top:16px;">
+        <h3>Product / Stock Details</h3>
+        <div class="form-row form-row--2">
+          <div class="form-group"><label class="form-label">Product Name</label><input class="input" id="productName" placeholder="e.g. Women's Dresses"></div>
+          <div class="form-group"><label class="form-label">Stock Quantity</label><input class="input" type="number" id="productQuantity" min="1" placeholder="e.g. 12"></div>
+        </div>
+        <div class="form-group"><label class="form-label">Product Details</label><textarea class="input" id="productDetails" rows="2" placeholder="Sizes, materials, supplier, etc."></textarea></div>
+        <div class="form-group"><label class="form-label">Estimated Purchase Cost (PKR)</label><input class="input" type="number" id="purchaseCost" min="0" placeholder="e.g. 7800"></div>
+      </div>
+
+      <div class="card" style="margin-top:16px;">
+        <h3>Funding &amp; Returns</h3>
+        <div class="form-row form-row--2">
+          <div class="form-group"><label class="form-label">Required Capital (PKR)</label><input class="input" type="number" id="requiredCapital" min="1" placeholder="e.g. 7800"></div>
+          <div class="form-group"><label class="form-label">Investor Return (%)</label><input class="input" type="number" id="investorReturnPercent" min="0.1" step="0.1" placeholder="e.g. 5"></div>
+        </div>
+        <div class="form-row form-row--2">
+          <div class="form-group"><label class="form-label">Minimum Investment (PKR)</label><input class="input" type="number" id="minimumInvestment" min="1" placeholder="e.g. 500"></div>
+          <div class="form-group"><label class="form-label">Maximum Investment / Investor (PKR)</label><input class="input" type="number" id="maximumInvestmentPerInvestor" min="1" placeholder="e.g. 3000"></div>
+        </div>
+        <div class="form-row form-row--2">
+          <div class="form-group"><label class="form-label">Duration (months)</label><input class="input" type="number" id="durationMonths" min="1" placeholder="e.g. 2"></div>
+          <div class="form-group"><label class="form-label">Stock Purchase Window (days)</label><input class="input" type="number" id="stockPurchaseWindowDays" min="1" value="30"></div>
+        </div>
+        <div class="form-group"><label class="form-label">Funding Deadline</label><input class="input" type="date" id="fundingDeadline"></div>
+      </div>
+
+      <div class="form-error" id="form-error" style="margin-top:12px;"></div>
+      <div class="flex gap-12 flex-wrap" style="margin-top:16px;">
+        <button class="btn btn--ghost" id="save-draft-btn">Save as Draft</button>
+        <button class="btn btn--primary" id="submit-review-btn">Submit for Review</button>
+      </div>`;
+
+    function readForm() {
+      return {
+        title: document.getElementById("title").value.trim(),
+        category: document.getElementById("category").value,
+        imageUrl: document.getElementById("imageUrl").value.trim(),
+        description: document.getElementById("description").value.trim(),
+        productName: document.getElementById("productName").value.trim(),
+        productQuantity: document.getElementById("productQuantity").value,
+        productDetails: document.getElementById("productDetails").value.trim(),
+        purchaseCost: document.getElementById("purchaseCost").value,
+        requiredCapital: document.getElementById("requiredCapital").value,
+        investorReturnPercent: document.getElementById("investorReturnPercent").value,
+        minimumInvestment: document.getElementById("minimumInvestment").value,
+        maximumInvestmentPerInvestor: document.getElementById("maximumInvestmentPerInvestor").value,
+        durationMonths: document.getElementById("durationMonths").value,
+        stockPurchaseWindowDays: document.getElementById("stockPurchaseWindowDays").value,
+        fundingDeadline: document.getElementById("fundingDeadline").value
+      };
+    }
+
+    function validate(data) {
+      const { valid, errors } = validateForm({
+        title: { value: data.title, rules: [[isNonEmpty, "Title is required."]] },
+        productName: { value: data.productName, rules: [[isNonEmpty, "Product name is required."]] },
+        productQuantity: { value: data.productQuantity, rules: [[isPositiveNumber, "Enter a valid stock quantity."]] },
+        requiredCapital: { value: data.requiredCapital, rules: [[isPositiveNumber, "Enter a valid required capital."]] },
+        investorReturnPercent: { value: data.investorReturnPercent, rules: [[isPositiveNumber, "Enter a valid return percentage."]] },
+        minimumInvestment: { value: data.minimumInvestment, rules: [[isPositiveNumber, "Enter a valid minimum investment."]] },
+        maximumInvestmentPerInvestor: { value: data.maximumInvestmentPerInvestor, rules: [[isPositiveNumber, "Enter a valid maximum investment."]] },
+        durationMonths: { value: data.durationMonths, rules: [[isPositiveNumber, "Enter a valid duration."]] }
+      });
+      if (valid && Number(data.minimumInvestment) > Number(data.maximumInvestmentPerInvestor)) {
+        return { valid: false, reason: "Minimum investment cannot exceed maximum investment." };
+      }
+      if (valid && Number(data.minimumInvestment) > Number(data.requiredCapital)) {
+        return { valid: false, reason: "Minimum investment cannot exceed required capital." };
+      }
+      return valid ? { valid: true } : { valid: false, reason: Object.values(errors)[0] };
+    }
+
+    document.getElementById("save-draft-btn").addEventListener("click", async () => {
+      const data = readForm();
+      const check = validate(data);
+      const errorBox = document.getElementById("form-error");
+      if (!check.valid) { errorBox.textContent = check.reason; return; }
+      errorBox.textContent = "";
+      try {
+        const id = await createOpportunityDraft(session.user.uid, data);
+        toast("Draft saved.", "success");
+        window.location.href = `owner-opportunity.html?id=${id}`;
+      } catch (e) {
+        errorBox.textContent = e.message || "Could not save draft.";
+      }
+    });
+
+    document.getElementById("submit-review-btn").addEventListener("click", async () => {
+      const data = readForm();
+      const check = validate(data);
+      const errorBox = document.getElementById("form-error");
+      if (!check.valid) { errorBox.textContent = check.reason; return; }
+      errorBox.textContent = "";
+      try {
+        const id = await createOpportunityDraft(session.user.uid, data);
+        await submitForReview(id, session.user.uid);
+        toast("Submitted for admin review.", "success");
+        window.location.href = `owner-opportunity.html?id=${id}`;
+      } catch (e) {
+        errorBox.textContent = e.message || "Could not submit for review.";
+      }
+    });
+  }
+
+  init();
+</script>
+</body>
+</html>

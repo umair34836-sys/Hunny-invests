@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Opportunity — Hunny Invests</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/dashboard.css">
+<link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+<header id="site-header"></header>
+
+<main class="section container" id="opp-detail" style="max-width:900px;">
+  <div id="detail-content"></div>
+</main>
+
+<footer id="site-footer"></footer>
+
+<script type="module">
+  import { renderPublicNav, toast, loadingHTML, errorHTML, statusBadge, progressBar, confirmModal, openModal, closeModal } from "./js/ui.js";
+  import { getOptionalSession } from "./js/guards.js";
+  import { getOpportunity } from "./js/opportunities.js";
+  import { investInOpportunity, getOpportunityInvestments } from "./js/investments.js";
+  import { formatPKR, formatPercent, formatDate, escapeHTML, getQueryParam, isValidImageUrl } from "./js/utils.js";
+  import { calculateFundingProgress, calculateRemainingFunding, calculateInvestorProfit, calculateExpectedPayout, validateInvestmentAmount } from "./js/calculations.js";
+  import { getWallet } from "./js/wallet.js";
+
+  const id = getQueryParam("id");
+  const content = document.getElementById("detail-content");
+
+  function investPanel(opp, session) {
+    if (opp.status !== "funding") {
+      return `<div class="alert alert--info">This opportunity is not currently open for investment (status: ${statusBadge(opp.status)}).</div>`;
+    }
+    if (!session?.user) {
+      return `<div class="card text-center"><p>Log in to invest in this opportunity.</p><a class="btn btn--primary" href="login.html?redirect=${encodeURIComponent(`opportunity.html?id=${id}`)}">Log in to Invest</a></div>`;
+    }
+    if (session.userRecord.role !== "investor") {
+      return `<div class="alert alert--info">Only investor accounts can invest. You're signed in as ${escapeHTML(session.userRecord.role)}.</div>`;
+    }
+    return `
+      <div class="card">
+        <h3>Invest in this opportunity</h3>
+        <div class="form-group">
+          <label class="form-label">Amount (PKR)</label>
+          <div class="input--prefix-wrap"><span class="input-prefix">PKR</span>
+            <input type="number" class="input" id="invest-amount" min="${opp.minimumInvestment}" max="${opp.maximumInvestmentPerInvestor}" placeholder="e.g. ${opp.minimumInvestment}">
+          </div>
+          <p class="form-hint">Min ${formatPKR(opp.minimumInvestment)} · Max ${formatPKR(opp.maximumInvestmentPerInvestor)} per investor</p>
+        </div>
+        <div id="invest-preview" class="stack" style="margin-bottom:14px;"></div>
+        <div id="invest-error" class="form-error"></div>
+        <button class="btn btn--primary btn--block" id="invest-btn">Preview &amp; Invest</button>
+      </div>`;
+  }
+
+  function wireInvestPanel(opp, session) {
+    const amountInput = document.getElementById("invest-amount");
+    const preview = document.getElementById("invest-preview");
+    const errorBox = document.getElementById("invest-error");
+    const btn = document.getElementById("invest-btn");
+    if (!amountInput) return;
+
+    amountInput.addEventListener("input", () => {
+      const amt = Number(amountInput.value);
+      errorBox.textContent = "";
+      if (!amt) { preview.innerHTML = ""; return; }
+      const profit = calculateInvestorProfit(amt, opp.investorReturnPercent);
+      const payout = calculateExpectedPayout(amt, opp.investorReturnPercent);
+      preview.innerHTML = `
+        <div class="kv-row"><span>Investment</span><span class="money">${formatPKR(amt)}</span></div>
+        <div class="kv-row"><span>Advertised return</span><span>${formatPercent(opp.investorReturnPercent)}</span></div>
+        <div class="kv-row"><span>Expected return amount</span><span class="money">${formatPKR(profit)}</span></div>
+        <div class="kv-row"><span>Expected maturity payout</span><span class="money">${formatPKR(payout)}</span></div>`;
+    });
+
+    btn.addEventListener("click", async () => {
+      const amt = Number(amountInput.value);
+      const wallet = await getWallet(session.user.uid);
+      const remaining = calculateRemainingFunding(opp.fundedAmount, opp.requiredCapital);
+      const validation = validateInvestmentAmount({
+        amount: amt, minInvestment: opp.minimumInvestment, maxInvestment: opp.maximumInvestmentPerInvestor,
+        availableBalance: wallet?.availableBalance, remainingFunding: remaining
+      });
+      if (!validation.valid) { errorBox.textContent = validation.reason; return; }
+
+      const ok = await confirmModal(
+        `Invest ${formatPKR(amt)} into "${opp.title}"? This amount will move from your available wallet balance to locked investment balance.`,
+        { title: "Confirm Investment", confirmText: "Confirm & Invest" }
+      );
+      if (!ok) return;
+
+      btn.disabled = true; btn.textContent = "Processing…";
+      try {
+        await investInOpportunity({ opportunityId: id, investorId: session.user.uid, amount: amt });
+        toast("Investment successful!", "success");
+        setTimeout(() => window.location.href = "investments.html", 900);
+      } catch (e) {
+        errorBox.textContent = e.message || "Investment failed.";
+        btn.disabled = false; btn.textContent = "Preview & Invest";
+      }
+    });
+  }
+
+  async function init() {
+    content.innerHTML = loadingHTML("Loading opportunity…");
+    const session = await getOptionalSession();
+    renderPublicNav("opportunities", session);
+
+    if (!id) { content.innerHTML = errorHTML("No opportunity specified."); return; }
+    let opp;
+    try {
+      opp = await getOpportunity(id);
+    } catch (e) { content.innerHTML = errorHTML("Could not load this opportunity."); return; }
+    if (!opp) { content.innerHTML = errorHTML("Opportunity not found."); return; }
+
+    const progress = calculateFundingProgress(opp.fundedAmount, opp.requiredCapital);
+    const img = isValidImageUrl(opp.imageUrl)
+      ? `<img src="${escapeHTML(opp.imageUrl)}" style="width:100%;border-radius:var(--radius-lg);margin-bottom:18px;max-height:320px;object-fit:cover;">`
+      : "";
+
+    content.innerHTML = `
+      ${img}
+      <div class="flex-between flex-wrap gap-8" style="margin-bottom:6px;">
+        ${statusBadge(opp.status)}<span class="pill-tag">${escapeHTML(opp.category || "General")}</span>
+      </div>
+      <h1>${escapeHTML(opp.title)}</h1>
+      <p>${escapeHTML(opp.description || "")}</p>
+
+      <div class="card" style="margin-bottom:18px;">
+        <div class="flex-between" style="margin-bottom:10px;">
+          <strong>${formatPKR(opp.fundedAmount)} funded</strong><span class="text-muted">of ${formatPKR(opp.requiredCapital)}</span>
+        </div>
+        ${progressBar(progress)}
+        <div class="stat-grid" style="margin-top:16px;">
+          <div class="stat-card"><div class="stat-card__label">Investor Return</div><div class="stat-card__value">${formatPercent(opp.investorReturnPercent)}</div></div>
+          <div class="stat-card"><div class="stat-card__label">Duration</div><div class="stat-card__value">${opp.durationMonths} mo</div></div>
+          <div class="stat-card"><div class="stat-card__label">Minimum</div><div class="stat-card__value">${formatPKR(opp.minimumInvestment)}</div></div>
+          <div class="stat-card"><div class="stat-card__label">Maximum</div><div class="stat-card__value">${formatPKR(opp.maximumInvestmentPerInvestor)}</div></div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:18px;">
+        <h3>Product / Stock Details</h3>
+        <div class="kv-row"><span>Product</span><span>${escapeHTML(opp.productName || "—")}</span></div>
+        <div class="kv-row"><span>Details</span><span>${escapeHTML(opp.productDetails || "—")}</span></div>
+        <div class="kv-row"><span>Stock quantity</span><span>${opp.stockQuantity ?? "—"}</span></div>
+        <div class="kv-row"><span>Sold so far</span><span>${opp.soldQuantity ?? 0}</span></div>
+        <div class="kv-row"><span>Remaining</span><span>${opp.remainingQuantity ?? "—"}</span></div>
+        <div class="kv-row"><span>Estimated purchase cost</span><span>${formatPKR(opp.purchaseCost)}</span></div>
+      </div>
+
+      <div class="card" style="margin-bottom:18px;">
+        <h3>Timeline</h3>
+        <div class="kv-row"><span>Funding deadline</span><span>${opp.fundingDeadline ? formatDate(opp.fundingDeadline) : "—"}</span></div>
+        <div class="kv-row"><span>Stock purchase window</span><span>${opp.stockPurchaseWindowDays || 30} days after full funding</span></div>
+        <div class="kv-row"><span>Stock purchase deadline</span><span>${opp.stockPurchaseDeadline ? formatDate(opp.stockPurchaseDeadline) : "—"}</span></div>
+        <div class="kv-row"><span>Investment started</span><span>${opp.activeAt ? formatDate(opp.activeAt) : "Not yet started"}</span></div>
+        <div class="kv-row"><span>Maturity date</span><span>${opp.maturityAt ? formatDate(opp.maturityAt) : "Set once active"}</span></div>
+      </div>
+
+      <div class="alert alert--warning">
+        <strong>Terms:</strong> Your return is a fixed ${formatPercent(opp.investorReturnPercent)} of your own invested amount — not a share of actual business profit.
+        If zero units sell by maturity, you receive your principal minus a ${formatPercent(opp.zeroSaleRefundFeePercent ?? 1)} fee.
+        Early exit before the investment period starts costs a ${formatPercent(opp.earlyExitFeePercent ?? 2)} fee. After the timer starts, funds are locked until maturity.
+        Read the full <a href="risk-disclosure.html">Risk Disclosure</a>.
+      </div>
+
+      <div id="invest-panel"></div>
+    `;
+
+    document.getElementById("invest-panel").innerHTML = investPanel(opp, session);
+    wireInvestPanel(opp, session);
+  }
+
+  init();
+</script>
+</body>
+</html>

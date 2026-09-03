@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Risk Disclosure — Hunny Invests</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+<header id="site-header"></header>
+
+<main class="section container legal-content">
+  <h1>Risk Disclosure</h1>
+  <div class="alert alert--danger">Investing through Hunny Invests carries real financial risk, including the risk of not receiving the advertised return. Please read this page in full before investing.</div>
+
+  <h2>1. Not a Guaranteed Return</h2>
+  <p>The advertised investor return on any opportunity is <strong>conditional</strong> — it is paid only if at least one unit of the underlying product sells before maturity. If zero units sell, you receive your principal minus a 1% fee, not the advertised return.</p>
+
+  <h2>2. Business &amp; Market Risk</h2>
+  <p>Opportunities are tied to real small businesses and real product sales. Sales performance can vary and is outside the Platform's control. A business making an overall loss does not, under the current stated model, reduce the advertised investor return — but this places the loss risk on the opportunity owner, which is a significant commercial arrangement that should be reviewed independently.</p>
+
+  <h2>3. Liquidity Risk</h2>
+  <p>Once an opportunity's investment period starts, your funds are locked until maturity. Early exit is only available before the investment period starts, and carries a 2% fee.</p>
+
+  <h2>4. Platform &amp; Operational Risk</h2>
+  <p>Hunny Invests currently operates without a dedicated backend server — deposit verification, withdrawal processing, and maturity settlement are performed by admin-controlled workflows rather than automated systems. This introduces manual-process risk (e.g. delays) that a future backend-supported version aims to reduce.</p>
+
+  <h2>5. No Guaranteed Physical Stock Ownership</h2>
+  <p>Your proportional "stock share" is a participation record for transparency purposes. It does not currently guarantee direct physical ownership or delivery of stock; the final settlement mechanism (cash vs. physical) will be clarified before any large-scale real-money launch.</p>
+
+  <h2>6. Regulatory Status</h2>
+  <p>This Platform's legal and regulatory structure in Pakistan has not yet been fully established. Do not treat any content on this Platform as investment advice, a licensed financial product, or a legally guaranteed instrument.</p>
+
+  <h2>7. Your Responsibility</h2>
+  <p>Only invest what you can afford to have locked until maturity and can afford to risk. Read each opportunity's terms carefully before investing.</p>
+</main>
+
+<footer id="site-footer"></footer>
+
+<script type="module">
+  import { renderPublicNav } from "./js/ui.js";
+  import { getOptionalSession } from "./js/guards.js";
+  (async () => renderPublicNav("", await getOptionalSession()))();
+</script>
+</body>
+</html>

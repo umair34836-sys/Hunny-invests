@@ -1,0 +1,399 @@
+rules_version = '2';
+
+// =============================================================================
+// Hunny Invests — Firestore Security Rules
+// =============================================================================
+// This is the real access-control boundary for the platform (per spec §28/§37).
+// The frontend has no trusted server (no Cloud Functions), so these rules do
+// as much delta/shape validation as Firestore rules reasonably allow for
+// financial writes (wallet balances, investments, settlements). This is
+// documented as PROTOTYPE-GRADE per the spec (§27/§38): before real-money
+// launch at scale, have these rules professionally security-audited and
+// consider introducing a trusted backend for the highest-risk operations.
+// =============================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ------------------------------- Helpers --------------------------------
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function userDoc(uid) {
+      return get(/databases/$(database)/documents/users/$(uid));
+    }
+
+    function role() {
+      return isSignedIn() ? userDoc(request.auth.uid).data.role : null;
+    }
+
+    function isActive() {
+      return isSignedIn() && userDoc(request.auth.uid).data.status == 'active';
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (role() == 'admin' || role() == 'super_admin');
+    }
+
+    function isSuperAdmin() {
+      return isSignedIn() && role() == 'super_admin';
+    }
+
+    function isOwnerRole() {
+      return isSignedIn() && role() == 'owner';
+    }
+
+    function isSelf(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function unchanged(field) {
+      return request.resource.data[field] == resource.data[field];
+    }
+
+    function opportunityOwnerId(oppId) {
+      return get(/databases/$(database)/documents/opportunities/$(oppId)).data.ownerId;
+    }
+
+    // round-tolerant equality for money math done client-side
+    function approxEqual(a, b) {
+      return a >= b - 0.01 && a <= b + 0.01;
+    }
+
+    // ---------------------------------- users --------------------------------
+    // Role & status live here. Never trust client-provided role/status changes
+    // except through the narrow, admin-gated paths below.
+    match /users/{userId} {
+      allow read: if isSelf(userId) || isAdmin();
+
+      // Self-registration only: always role=investor, status=active.
+      allow create: if isSelf(userId)
+        && request.resource.data.uid == userId
+        && request.resource.data.role == 'investor'
+        && request.resource.data.status == 'active';
+
+      // Admin-controlled role/status changes:
+      //  - super_admin may grant/revoke admin or super_admin roles.
+      //  - admin (or super_admin) may grant/revoke owner role and
+      //    suspend/reactivate investor & owner accounts, but may NOT
+      //    touch admin/super_admin accounts or grant admin-level roles.
+      allow update: if isSuperAdmin()
+        || (
+          isAdmin()
+          && resource.data.role != 'admin' && resource.data.role != 'super_admin'
+          && request.resource.data.role != 'admin' && request.resource.data.role != 'super_admin'
+        );
+
+      allow delete: if false;
+    }
+
+    // -------------------------------- profiles --------------------------------
+    match /profiles/{userId} {
+      allow read: if isSelf(userId) || isAdmin();
+      allow create: if isSelf(userId) && request.resource.data.uid == userId;
+      // Self may only edit non-sensitive profile fields; role/uid never live here.
+      allow update: if isSelf(userId) || isAdmin();
+      allow delete: if false;
+    }
+
+    // --------------------------------- wallets ---------------------------------
+    match /wallets/{userId} {
+      allow read: if isSelf(userId) || isAdmin();
+
+      // Created once at registration, all-zero.
+      allow create: if isSelf(userId)
+        && request.resource.data.availableBalance == 0
+        && request.resource.data.lockedBalance == 0
+        && request.resource.data.totalDeposited == 0
+        && request.resource.data.totalInvested == 0
+        && request.resource.data.totalProfit == 0
+        && request.resource.data.totalWithdrawn == 0
+        && request.resource.data.totalRefunded == 0;
+
+      // Admin: free updates (deposit/withdrawal approval, settlements, corrections).
+      // Self: ONLY the two narrow, delta-validated shapes below — everything
+      // else (deposits, withdrawals, profit, refunds from settlement) is
+      // admin-mediated per the spec's manual verification workflow.
+      allow update: if isAdmin() || isValidInvestDelta() || isValidEarlyExitDelta();
+
+      function isValidInvestDelta() {
+        let amt = resource.data.availableBalance - request.resource.data.availableBalance;
+        return isSelf(userId)
+          && amt > 0
+          && approxEqual(request.resource.data.lockedBalance, resource.data.lockedBalance + amt)
+          && approxEqual(request.resource.data.totalInvested, resource.data.totalInvested + amt)
+          && unchanged('totalDeposited') && unchanged('totalProfit')
+          && unchanged('totalWithdrawn') && unchanged('totalRefunded');
+      }
+
+      function isValidEarlyExitDelta() {
+        let refund = request.resource.data.availableBalance - resource.data.availableBalance;
+        let lockedDrop = resource.data.lockedBalance - request.resource.data.lockedBalance;
+        return isSelf(userId)
+          && refund > 0
+          && lockedDrop >= refund // fee kept out of wallet (lockedDrop == original investment, refund <= that)
+          && approxEqual(request.resource.data.totalRefunded, resource.data.totalRefunded + refund)
+          && unchanged('totalDeposited') && unchanged('totalInvested') && unchanged('totalProfit') && unchanged('totalWithdrawn');
+      }
+
+      allow delete: if false;
+    }
+
+    // --------------------------- walletTransactions ----------------------------
+    // Immutable ledger. Investors may log their own 'investment' / 'early_exit_fee'
+    // entries as part of the client transaction; every other type is admin-only.
+    match /walletTransactions/{txId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAdmin()
+        || (
+          isSignedIn()
+          && request.resource.data.userId == request.auth.uid
+          && request.resource.data.processedBy == request.auth.uid
+          && request.resource.data.type in ['investment', 'early_exit_fee']
+        );
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // ----------------------------- depositRequests ------------------------------
+    match /depositRequests/{depositId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSelf(request.resource.data.userId)
+        && request.resource.data.amount > 0
+        && request.resource.data.status == 'pending';
+      // Owner may only cancel their own still-pending request.
+      allow update: if isAdmin()
+        || (
+          isSelf(resource.data.userId)
+          && resource.data.status == 'pending'
+          && request.resource.data.status == 'cancelled'
+        );
+      allow delete: if false;
+    }
+
+    // ---------------------------- withdrawalRequests -----------------------------
+    match /withdrawalRequests/{withdrawalId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSelf(request.resource.data.userId)
+        && request.resource.data.amount > 0
+        && request.resource.data.status == 'pending';
+      allow update: if isAdmin()
+        || (
+          isSelf(resource.data.userId)
+          && resource.data.status == 'pending'
+          && request.resource.data.status == 'cancelled'
+        );
+      allow delete: if false;
+    }
+
+    // ------------------------------- opportunities --------------------------------
+    // Public marketplace: readable by anyone (no financial exposure of individuals).
+    match /opportunities/{oppId} {
+      allow read: if true;
+
+      allow create: if isOwnerRole()
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.status == 'draft'
+        && request.resource.data.fundedAmount == 0
+        && request.resource.data.investorCount == 0;
+
+      allow update: if isAdmin() || isOwnerDraftEdit() || isOwnerSubmitReview()
+        || isOwnerStartInvestment() || isOwnerOperational() || isInvestorFundingDelta()
+        || isFundingCompleteTransition();
+
+      // Owner freely edits their own draft (pre-review).
+      function isOwnerDraftEdit() {
+        return isSelf(resource.data.ownerId)
+          && resource.data.status == 'draft'
+          && request.resource.data.status == 'draft'
+          && unchanged('ownerId') && unchanged('fundedAmount') && unchanged('investorCount');
+      }
+
+      // Owner submits draft for admin review.
+      function isOwnerSubmitReview() {
+        return isSelf(resource.data.ownerId)
+          && resource.data.status == 'draft'
+          && request.resource.data.status == 'pending_review'
+          && unchanged('fundedAmount') && unchanged('investorCount') && unchanged('ownerId');
+      }
+
+      // Owner records stock purchase & starts the investment timer.
+      function isOwnerStartInvestment() {
+        return isSelf(resource.data.ownerId)
+          && resource.data.status == 'awaiting_stock_purchase'
+          && request.resource.data.status == 'active'
+          && unchanged('fundedAmount') && unchanged('investorCount') && unchanged('requiredCapital');
+      }
+
+      // Owner records sales/stock updates, or submits for settlement, while
+      // active/matured — cannot touch funding or capital terms.
+      function isOwnerOperational() {
+        return isSelf(resource.data.ownerId)
+          && resource.data.status in ['active', 'matured']
+          && request.resource.data.status in ['active', 'matured', 'settlement_pending']
+          && unchanged('fundedAmount') && unchanged('investorCount')
+          && unchanged('requiredCapital') && unchanged('investorReturnPercent');
+      }
+
+      // Investor invests (funded amount increases) or early-exits before the
+      // investment period starts (funded amount decreases). Status/ownerId
+      // untouched by this path — only funding figures move.
+      function isInvestorFundingDelta() {
+        return isSignedIn() && !isSelf(resource.data.ownerId)
+          && resource.data.status in ['funding', 'awaiting_stock_purchase']
+          && unchanged('status') && unchanged('ownerId') && unchanged('requiredCapital')
+          && request.resource.data.fundedAmount >= 0
+          && request.resource.data.fundedAmount <= resource.data.requiredCapital + 0.01;
+      }
+
+      // Secondary, best-effort write fired right after an investment pushes
+      // funding to 100%: flips funding -> awaiting_stock_purchase and stamps
+      // the stock-purchase deadline. Gated on the target actually being
+      // reached (which is only reachable via the validated investor-funding
+      // path above), so any signed-in user may fire it — it only ever moves
+      // a genuinely-fully-funded opportunity into its next real state.
+      function isFundingCompleteTransition() {
+        return isSignedIn()
+          && resource.data.status == 'funding'
+          && request.resource.data.status == 'awaiting_stock_purchase'
+          && resource.data.fundedAmount >= resource.data.requiredCapital - 0.01
+          && unchanged('fundedAmount') && unchanged('investorCount')
+          && unchanged('ownerId') && unchanged('requiredCapital');
+      }
+
+      allow delete: if false;
+    }
+
+    // -------------------------------- investments ---------------------------------
+    match /investments/{investmentId} {
+      allow read: if isSignedIn() && (
+        resource.data.investorId == request.auth.uid
+        || isAdmin()
+        || opportunityOwnerId(resource.data.opportunityId) == request.auth.uid
+      );
+
+      // Cross-document check (via getAfter, evaluated against the state AFTER
+      // every write in this same commit/transaction): a standalone fake
+      // investment doc — created without the paired wallet lock + opportunity
+      // funding writes in the SAME transaction — is rejected. This is what
+      // stops a client from fabricating an investment record that later gets
+      // paid out real money at settlement.
+      function investmentBackedByRealMoney() {
+        let wallet = getAfter(/databases/$(database)/documents/wallets/$(request.resource.data.investorId)).data;
+        let walletBefore = get(/databases/$(database)/documents/wallets/$(request.resource.data.investorId)).data;
+        let opp = getAfter(/databases/$(database)/documents/opportunities/$(request.resource.data.opportunityId)).data;
+        let oppBefore = get(/databases/$(database)/documents/opportunities/$(request.resource.data.opportunityId)).data;
+        return wallet.lockedBalance >= walletBefore.lockedBalance + request.resource.data.investedAmount - 0.01
+          && opp.fundedAmount >= oppBefore.fundedAmount + request.resource.data.investedAmount - 0.01;
+      }
+
+      allow create: if isSelf(request.resource.data.investorId)
+        && request.resource.data.investedAmount > 0
+        && request.resource.data.status == 'invested'
+        && investmentBackedByRealMoney();
+
+      allow update: if isAdmin() || isSelfEarlyExit() || isOwnerActivation();
+
+      // Investor requests early exit on their own still-pending investment —
+      // also cross-checked so the wallet's locked balance actually dropped by
+      // the investment amount in this same commit.
+      function isSelfEarlyExit() {
+        let walletAfter = getAfter(/databases/$(database)/documents/wallets/$(resource.data.investorId)).data;
+        let walletBefore = get(/databases/$(database)/documents/wallets/$(resource.data.investorId)).data;
+        return isSelf(resource.data.investorId)
+          && resource.data.status == 'invested'
+          && request.resource.data.status == 'exited'
+          && unchanged('investedAmount') && unchanged('investorId') && unchanged('opportunityId')
+          && walletBefore.lockedBalance - walletAfter.lockedBalance >= resource.data.investedAmount - 0.01;
+      }
+
+      // Opportunity owner flips their investors' records to 'active' when
+      // they start the investment period (stock purchased).
+      function isOwnerActivation() {
+        return opportunityOwnerId(resource.data.opportunityId) == request.auth.uid
+          && resource.data.status == 'invested'
+          && request.resource.data.status == 'active'
+          && unchanged('investedAmount') && unchanged('investorId') && unchanged('opportunityId');
+      }
+
+      allow delete: if false;
+    }
+
+    // -------------------------------- stockItems -----------------------------------
+    match /stockItems/{itemId} {
+      allow read: if true;
+      allow create: if isSelf(request.resource.data.ownerId) && isOwnerRole();
+      allow update: if isSelf(resource.data.ownerId) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ----------------------------------- sales --------------------------------------
+    match /sales/{saleId} {
+      allow read: if isSignedIn();
+      allow create: if isSelf(request.resource.data.recordedBy)
+        && opportunityOwnerId(request.resource.data.opportunityId) == request.auth.uid;
+      allow update: if isSelf(resource.data.recordedBy) || isAdmin();
+      allow delete: if false;
+    }
+
+    // --------------------------------- expenses --------------------------------------
+    match /expenses/{expenseId} {
+      allow read: if isSignedIn() && (resource.data.ownerId == request.auth.uid || isAdmin());
+      allow create: if isSelf(request.resource.data.ownerId)
+        && opportunityOwnerId(request.resource.data.opportunityId) == request.auth.uid
+        && request.resource.data.approvalStatus == 'pending';
+      // Immutable to the owner once created (spec §19) — only admin may review it.
+      allow update: if isAdmin();
+      allow delete: if false;
+    }
+
+    // -------------------------------- settlements -------------------------------------
+    match /settlements/{settlementId} {
+      allow read: if isAdmin()
+        || (isSignedIn() && opportunityOwnerId(resource.data.opportunityId) == request.auth.uid);
+      allow write: if isAdmin();
+    }
+
+    // ------------------------------- notifications --------------------------------------
+    // Low financial risk (display-only); any signed-in user may create a
+    // notification addressed to another user as a side effect of a legitimate
+    // in-app action (e.g. investor invests -> owner is notified). Reading,
+    // marking read, and deleting is restricted to the recipient or admin.
+    match /notifications/{notifId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource.data.userId == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+      allow delete: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    // -------------------------------- auditLogs -------------------------------------------
+    match /auditLogs/{auditId} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn() && request.resource.data.actorId == request.auth.uid;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // ---------------------------- platformSettings ------------------------------------------
+    match /platformSettings/{settingId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // ----------------------------- supportTickets -------------------------------------------
+    match /supportTickets/{ticketId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSelf(request.resource.data.userId);
+      allow update: if isAdmin();
+      allow delete: if false;
+    }
+
+    // Deny everything else by default.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

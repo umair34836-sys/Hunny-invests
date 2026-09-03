@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Owner Dashboard — Hunny Invests</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/dashboard.css">
+<link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+<div id="app-shell"></div>
+
+<script type="module">
+  import { requireAuth } from "./js/guards.js";
+  import { renderAppShell, loadingHTML, emptyHTML, errorHTML } from "./js/ui.js";
+  import { getOwnerStats } from "./js/owner.js";
+  import { getUnreadCount } from "./js/notifications.js";
+  import { formatPKR, escapeHTML } from "./js/utils.js";
+  import { renderOpportunityCardHTML } from "./js/opportunities.js";
+
+  async function init() {
+    const session = await requireAuth(["owner"]);
+    if (!session) return;
+    const unreadCount = await getUnreadCount(session.user.uid);
+    const page = renderAppShell({ role: "owner", active: "owner-dashboard", title: "Owner Dashboard", profile: session.profile, unreadCount });
+    page.innerHTML = loadingHTML("Loading your dashboard…");
+
+    try {
+      const stats = await getOwnerStats(session.user.uid);
+
+      page.innerHTML = `
+        <div class="stat-grid">
+          <div class="stat-card stat-card--accent"><div class="stat-card__label">📦 Active Opportunities</div><div class="stat-card__value">${stats.activeOpportunities}</div></div>
+          <div class="stat-card"><div class="stat-card__label">💰 Total Funded Capital</div><div class="stat-card__value">${formatPKR(stats.totalFundedCapital)}</div></div>
+          <div class="stat-card"><div class="stat-card__label">✅ Stock Purchased</div><div class="stat-card__value">${stats.stockPurchased}</div></div>
+          <div class="stat-card"><div class="stat-card__label">🛒 Units Sold</div><div class="stat-card__value">${stats.soldUnits}</div></div>
+          <div class="stat-card"><div class="stat-card__label">📈 Revenue</div><div class="stat-card__value">${formatPKR(stats.revenue)}</div></div>
+          <div class="stat-card"><div class="stat-card__label">💵 Est. Business Profit</div><div class="stat-card__value">${formatPKR(stats.businessProfitEstimate)}</div></div>
+          <div class="stat-card"><div class="stat-card__label">⚖️ Pending Settlements</div><div class="stat-card__value">${stats.pendingSettlements}</div></div>
+        </div>
+
+        <div class="dash-section">
+          <div class="dash-section__head"><h2>Your Opportunities</h2><a href="owner-create-opportunity.html" class="btn btn--primary btn--sm">+ New Opportunity</a></div>
+          <div class="opp-grid" id="opp-list"></div>
+        </div>`;
+
+      const list = document.getElementById("opp-list");
+      list.innerHTML = stats.opportunities.length
+        ? stats.opportunities.slice(0, 8).map((o) => renderOpportunityCardHTML(o, { linkBase: "owner-opportunity.html?id=" })).join("")
+        : emptyHTML("You haven't created any opportunities yet.", { icon: "📦", actionHTML: '<a href="owner-create-opportunity.html" class="btn btn--primary btn--sm">Create Your First Opportunity</a>' });
+    } catch (e) {
+      console.error(e);
+      page.innerHTML = errorHTML("Could not load your dashboard.");
+    }
+  }
+
+  init();
+</script>
+</body>
+</html>

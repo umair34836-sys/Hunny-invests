@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Opportunities — Admin — Hunny Invests</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/dashboard.css">
+<link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+<div id="app-shell"></div>
+
+<script type="module">
+  import { requireAuth } from "./js/guards.js";
+  import { renderAppShell, loadingHTML, errorHTML, emptyHTML, statusBadge, progressBar, toast, confirmModal, promptModal } from "./js/ui.js";
+  import {
+    listOpportunitiesByStatus, adminApproveOpportunity, adminRejectOpportunity,
+    adminFreezeOpportunity, adminUnfreezeOpportunity, adminCancelOpportunity
+  } from "./js/opportunities.js";
+  import { adminProcessDeadlineRefund } from "./js/settlements.js";
+  import { getUnreadCount } from "./js/notifications.js";
+  import { formatPKR, escapeHTML, getQueryParam } from "./js/utils.js";
+  import { calculateFundingProgress } from "./js/calculations.js";
+
+  const FILTERS = ["all", "pending_review", "funding", "awaiting_stock_purchase", "active", "matured", "settlement_pending", "completed", "frozen", "rejected", "refund_pending", "refunded", "cancelled"];
+  let currentAdminId; let currentFilter = getQueryParam("status") || "pending_review";
+
+  function actionsFor(o) {
+    const btns = [];
+    if (o.status === "pending_review") { btns.push(`<button class="btn btn--primary btn--sm approve-btn" data-id="${o.id}">Approve</button>`); btns.push(`<button class="btn btn--danger btn--sm reject-btn" data-id="${o.id}">Reject</button>`); }
+    if (o.status === "awaiting_stock_purchase") { btns.push(`<button class="btn btn--ghost btn--sm refund-btn" data-id="${o.id}">Process Deadline Refund</button>`); }
+    if (o.status === "frozen") { btns.push(`<button class="btn btn--primary btn--sm unfreeze-btn" data-id="${o.id}">Unfreeze</button>`); }
+    if (!["completed", "cancelled", "rejected", "refunded", "frozen"].includes(o.status)) { btns.push(`<button class="btn btn--ghost btn--sm freeze-btn" data-id="${o.id}">Freeze</button>`); }
+    if (!["completed", "cancelled", "rejected", "refunded"].includes(o.status)) { btns.push(`<button class="btn btn--danger btn--sm cancel-btn" data-id="${o.id}">Cancel</button>`); }
+    return btns.join("");
+  }
+
+  async function load() {
+    const page = document.getElementById("page-content");
+    page.innerHTML = `<div class="tabs" id="tabs">${FILTERS.map((f) => `<button class="tab-btn ${f === currentFilter ? "active" : ""}" data-f="${f}">${f.replace(/_/g, " ")}</button>`).join("")}</div><div id="opp-list">${loadingHTML("Loading…")}</div>`;
+    document.querySelectorAll(".tab-btn").forEach((btn) => btn.addEventListener("click", () => { currentFilter = btn.dataset.f; load(); }));
+
+    try {
+      const opps = await listOpportunitiesByStatus(currentFilter === "all" ? null : currentFilter);
+      const listEl = document.getElementById("opp-list");
+      if (!opps.length) { listEl.innerHTML = emptyHTML("No opportunities in this status."); return; }
+      listEl.innerHTML = `
+        <div class="data-table-wrap"><table class="data-table">
+          <thead><tr><th>Title</th><th>Owner</th><th>Funding</th><th>Status</th><th></th></tr></thead>
+          <tbody>${opps.map((o) => `<tr><td>${escapeHTML(o.title)}</td><td style="font-size:11px;color:var(--color-text-faint);">${o.ownerId.slice(0, 8)}…</td><td style="min-width:140px;">${progressBar(calculateFundingProgress(o.fundedAmount, o.requiredCapital))}</td><td>${statusBadge(o.status)}</td><td class="flex gap-8 flex-wrap">${actionsFor(o)}</td></tr>`).join("")}</tbody>
+        </table></div>
+        <div class="record-cards">${opps.map((o) => `<div class="record-card">
+          <div class="record-card__top"><span class="record-card__title">${escapeHTML(o.title)}</span>${statusBadge(o.status)}</div>
+          ${progressBar(calculateFundingProgress(o.fundedAmount, o.requiredCapital))}
+          <div class="record-card__actions">${actionsFor(o)}</div>
+        </div>`).join("")}</div>`;
+      wire();
+    } catch (e) {
+      console.error(e);
+      document.getElementById("opp-list").innerHTML = errorHTML("Could not load opportunities.");
+    }
+  }
+
+  function wire() {
+    document.querySelectorAll(".approve-btn").forEach((btn) => btn.addEventListener("click", async () => {
+      const ok = await confirmModal("Approve this opportunity? It will become visible for public funding.", { title: "Approve Opportunity" });
+      if (!ok) return;
+      await adminApproveOpportunity(btn.dataset.id, currentAdminId);
+      toast("Opportunity approved.", "success"); load();
+    }));
+    document.querySelectorAll(".reject-btn").forEach((btn) => btn.addEventListener("click", async () => {
+      const reason = await promptModal("Why is this opportunity being rejected?", { title: "Reject Opportunity", required: true, confirmText: "Reject" });
+      if (reason === null) return;
+      await adminRejectOpportunity(btn.dataset.id, currentAdminId, reason);
+      toast("Opportunity rejected.", "success"); load();
+    }));
+    document.querySelectorAll(".freeze-btn").forEach((btn) => btn.addEventListener("click", async () => {
+      const reason = await promptModal("Why is this opportunity being frozen?", { title: "Freeze Opportunity", required: true, confirmText: "Freeze" });
+      if (reason === null) return;
+      await adminFreezeOpportunity(btn.dataset.id, currentAdminId, reason);
+      toast("Opportunity frozen.", "success"); load();
+    }));
+    document.querySelectorAll(".unfreeze-btn").forEach((btn) => btn.addEventListener("click", async () => {
+      await adminUnfreezeOpportunity(btn.dataset.id, currentAdminId);
+      toast("Opportunity unfrozen.", "success"); load();
+    }));
+    document.querySelectorAll(".cancel-btn").forEach((btn) => btn.addEventListener("click", async () => {
+      const reason = await promptModal("Why is this opportunity being cancelled? This cannot be undone.", { title: "Cancel Opportunity", required: true, confirmText: "Cancel Opportunity" });
+      if (reason === null) return;
+      await adminCancelOpportunity(btn.dataset.id, currentAdminId, reason);
+      toast("Opportunity cancelled.", "success"); load();
+    }));
+    document.querySelectorAll(".refund-btn").forEach((btn) => btn.addEventListener("click", async () => {
+      const ok = await confirmModal("The stock purchase deadline has passed. Refund all investors in full (no fee)?", { title: "Process Deadline Refund", danger: true });
+      if (!ok) return;
+      try {
+        await adminProcessDeadlineRefund(btn.dataset.id, currentAdminId);
+        toast("Investors refunded in full.", "success"); load();
+      } catch (e) { toast(e.message || "Could not process refund.", "error"); }
+    }));
+  }
+
+  async function init() {
+    const session = await requireAuth(["admin", "super_admin"]);
+    if (!session) return;
+    currentAdminId = session.user.uid;
+    const unreadCount = await getUnreadCount(session.user.uid);
+    renderAppShell({ role: "admin", active: "admin-opportunities", title: "Opportunities", profile: session.profile, unreadCount });
+    load();
+  }
+
+  init();
+</script>
+</body>
+</html>

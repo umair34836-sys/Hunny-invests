@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Account Suspended — Hunny Invests</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+<header id="site-header"></header>
+<main class="section container text-center" style="max-width:520px;">
+  <div class="card">
+    <div class="state-icon">🔒</div>
+    <h2>Your account is suspended</h2>
+    <p>Your account has been temporarily suspended by our admin team. If you believe this is a mistake, please contact support.</p>
+    <a href="contact.html" class="btn btn--primary">Contact Support</a>
+    <button class="btn btn--ghost" id="logout-btn" style="margin-top:10px;">Log out</button>
+  </div>
+</main>
+<footer id="site-footer"></footer>
+<script type="module">
+  import { renderPublicNav } from "./js/ui.js";
+  import { logoutUser } from "./js/auth.js";
+  import { getOptionalSession } from "./js/guards.js";
+  (async () => renderPublicNav("", await getOptionalSession()))();
+  document.getElementById("logout-btn").addEventListener("click", async () => { await logoutUser(); window.location.href = "login.html"; });
+</script>
+</body>
+</html>

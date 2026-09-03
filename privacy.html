@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Privacy Policy — Hunny Invests</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+<header id="site-header"></header>
+
+<main class="section container legal-content">
+  <h1>Privacy Policy</h1>
+  <p class="text-muted">Last updated: 3 September 2026</p>
+
+  <h2>1. Information We Collect</h2>
+  <p>When you register, we collect your full name, email address, phone number, and authentication credentials (managed securely by Firebase Authentication — we never store your plaintext password). When you deposit or withdraw, we collect payment reference details you choose to share for verification purposes.</p>
+
+  <h2>2. How We Use Your Information</h2>
+  <ul>
+    <li>To create and manage your account and wallet.</li>
+    <li>To verify deposits and process withdrawals.</li>
+    <li>To send in-app notifications about your investments, deposits, and withdrawals.</li>
+    <li>To maintain audit logs of sensitive account and financial actions, for security and dispute resolution.</li>
+  </ul>
+
+  <h2>3. Information Sharing</h2>
+  <p>We do not sell your personal information. Opportunity owners can see aggregate investor participation in their own opportunities (e.g. total funded amount, investor count) but never another investor's private contact or payment details. Admins can access account and transaction data solely to operate the Platform.</p>
+
+  <h2>4. Data Storage</h2>
+  <p>Your data is stored in Firebase Firestore, a cloud database service, protected by Firestore Security Rules that restrict access based on your account role and ownership of the data.</p>
+
+  <h2>5. Your Rights</h2>
+  <p>You may update your profile information at any time from your Profile page. To request account deletion or data export, contact our admin team via the <a href="contact.html">Contact</a> page.</p>
+
+  <h2>6. Security</h2>
+  <p>We use Firebase Authentication for credential management and Firestore Security Rules to restrict access to sensitive financial fields. No system is 100% secure; please use a strong, unique password.</p>
+
+  <h2>7. Changes</h2>
+  <p>We may revise this Privacy Policy periodically. Material changes will be communicated via in-app notification.</p>
+</main>
+
+<footer id="site-footer"></footer>
+
+<script type="module">
+  import { renderPublicNav } from "./js/ui.js";
+  import { getOptionalSession } from "./js/guards.js";
+  (async () => renderPublicNav("", await getOptionalSession()))();
+</script>
+</body>
+</html>

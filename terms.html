@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Terms of Service — Hunny Invests</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+<header id="site-header"></header>
+
+<main class="section container legal-content">
+  <h1>Terms of Service</h1>
+  <p class="text-muted">Last updated: 3 September 2026</p>
+
+  <div class="alert alert--warning">These Terms describe the platform's intended product logic. They must be reviewed by a qualified Pakistan-based legal/compliance professional before the platform accepts public real-money investment at scale.</div>
+
+  <h2>1. Acceptance of Terms</h2>
+  <p>By creating an account or using Hunny Invests ("the Platform"), you agree to these Terms of Service, our <a href="privacy.html">Privacy Policy</a>, and our <a href="risk-disclosure.html">Risk Disclosure</a>.</p>
+
+  <h2>2. Accounts &amp; Roles</h2>
+  <p>The Platform supports three account roles: <strong>Investor</strong>, <strong>Owner</strong>, and <strong>Admin</strong>. Owner privileges are granted manually by an administrator after review and are never self-assigned. Admin access is limited to designated platform operators.</p>
+
+  <h2>3. Wallet, Deposits &amp; Withdrawals</h2>
+  <p>Deposits and withdrawals are processed manually. You are responsible for providing accurate payment references. The Platform verifies each deposit before crediting your wallet, and each withdrawal before releasing funds — typically within 24 hours, subject to payment availability.</p>
+
+  <h2>4. Investments</h2>
+  <p>When you invest, your funds move from your available wallet balance to a locked investment balance. Investment amounts are subject to each opportunity's minimum and maximum investment limits, and to the remaining funding required. Funding for any opportunity can never exceed its stated target.</p>
+
+  <h2>5. Investor Return</h2>
+  <p>Your return is a fixed percentage of <strong>your own invested amount</strong>, as advertised on the opportunity at the time you invested — not a percentage of the business's actual profit. Example: PKR 1,000 invested at 5% = PKR 50 return = PKR 1,050 total payout, if the qualifying sale condition is met.</p>
+
+  <h2>6. Zero-Sale Outcome</h2>
+  <p>If zero units of the underlying product are sold by the opportunity's maturity date, you receive your invested principal minus a 1% fee, applied proportionally to your investment.</p>
+
+  <h2>7. Early Exit</h2>
+  <p>Before the investment period begins (i.e. before the owner purchases stock and starts the timer), you may request an early exit, subject to a 2% fee on your invested amount. Once the investment period has started, early withdrawal is not available; funds remain locked until maturity.</p>
+
+  <h2>8. Stock Purchase Deadline</h2>
+  <p>If the owner does not purchase stock within the configured deadline after full funding, all investors are refunded in full, with no early-exit fee applied.</p>
+
+  <h2>9. Fees</h2>
+  <p>See our Fee Schedule within this document: Early exit fee — 2% of invested amount. Zero-sale refund fee — 1% of invested amount. No other investor-side fees apply unless separately disclosed on an opportunity.</p>
+
+  <h2>10. Owner Obligations</h2>
+  <p>Owners must accurately represent required capital, stock details, and return terms, and must record sales, stock and expenses truthfully. The Platform reserves the right to freeze, suspend or cancel an opportunity for inaccurate reporting.</p>
+
+  <h2>11. Platform Role &amp; Limitations</h2>
+  <p>The Platform provides infrastructure to connect investors and business owners. It does not guarantee returns, does not guarantee a payment gateway, and — because it currently uses no server-side backend — relies on manual admin verification for sensitive financial actions. This is disclosed to you as a limitation of the current product stage.</p>
+
+  <h2>12. Disputes</h2>
+  <p>Disputes should be raised via <a href="contact.html">Contact</a>. The Platform's admin team will review and, where appropriate, adjust records through documented, audited administrative actions.</p>
+
+  <h2>13. Changes to These Terms</h2>
+  <p>We may update these Terms from time to time. Continued use of the Platform after changes constitutes acceptance of the revised Terms.</p>
+</main>
+
+<footer id="site-footer"></footer>
+
+<script type="module">
+  import { renderPublicNav } from "./js/ui.js";
+  import { getOptionalSession } from "./js/guards.js";
+  (async () => renderPublicNav("", await getOptionalSession()))();
+</script>
+</body>
+</html>

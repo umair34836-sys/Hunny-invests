@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>About Us — Hunny Invests</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+<header id="site-header"></header>
+
+<main class="section container legal-content">
+  <h1>About Hunny Invests</h1>
+  <p class="lead">Hunny Invests is a marketplace that connects everyday investors with small, real-world business opportunities — starting with small-batch product ventures such as apparel and retail stock.</p>
+
+  <h2>Our Mission</h2>
+  <p>We believe investing shouldn't require large capital or financial jargon. Our platform lets anyone start with a small amount, understand exactly what they're funding, and see a clear, fixed return calculation before they commit a single rupee.</p>
+
+  <h2>How Opportunities Work</h2>
+  <p>Verified business owners list an opportunity describing the product, the capital required, the stock quantity, and the return they're offering investors. Once an opportunity is 100% funded, the owner purchases stock and starts the investment timer. At maturity, investors receive their principal plus the advertised return (if at least one unit sold) or their principal minus a small fee (if nothing sold).</p>
+
+  <h2>Our Commitment to Transparency</h2>
+  <ul>
+    <li>Every opportunity clearly separates investor return from actual business profit.</li>
+    <li>Funding can never exceed 100% of the stated target.</li>
+    <li>Deposits and withdrawals are manually verified by our admin team — no funds move without a human check.</li>
+    <li>Every sensitive action on the platform is recorded in an audit log.</li>
+  </ul>
+
+  <h2>Who Can Use Hunny Invests</h2>
+  <p><strong>Investors</strong> deposit funds and invest in opportunities. <strong>Owners</strong> (approved manually by our admin team) create and manage opportunities. <strong>Admins</strong> oversee the entire platform, verify deposits/withdrawals, and resolve disputes.</p>
+
+  <div class="alert alert--warning" style="margin-top:24px;">
+    This is a product-stage platform. Before accepting public real-money investment at scale, we are committed to obtaining Pakistan-specific legal and compliance guidance. Please read our <a href="risk-disclosure.html">Risk Disclosure</a>.
+  </div>
+</main>
+
+<footer id="site-footer"></footer>
+
+<script type="module">
+  import { renderPublicNav } from "./js/ui.js";
+  import { getOptionalSession } from "./js/guards.js";
+  (async () => renderPublicNav("about", await getOptionalSession()))();
+</script>
+</body>
+</html>

@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Opportunities — Hunny Invests</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/dashboard.css">
+<link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+<header id="site-header"></header>
+
+<main class="section container">
+  <div class="section-head" style="margin-bottom:20px;">
+    <span class="eyebrow">Marketplace</span>
+    <h1>Investment Opportunities</h1>
+    <p>Browse currently funding, active and past opportunities. Every card shows the required capital, funding progress, advertised return and duration up front.</p>
+  </div>
+
+  <div class="filter-bar">
+    <input class="input" id="f-search" placeholder="Search opportunities…">
+    <select class="input" id="f-category">
+      <option value="">All Categories</option>
+    </select>
+    <select class="input" id="f-status">
+      <option value="">All Statuses</option>
+      <option value="funding">Funding</option>
+      <option value="awaiting_stock_purchase">Awaiting Stock Purchase</option>
+      <option value="active">Active</option>
+      <option value="matured">Matured</option>
+      <option value="completed">Completed</option>
+    </select>
+    <select class="input" id="f-sort">
+      <option value="newest">Newest</option>
+      <option value="ending_soon">Ending Soon</option>
+    </select>
+  </div>
+
+  <div id="opp-list"><div class="opp-grid" id="opp-grid"></div></div>
+</main>
+
+<footer id="site-footer"></footer>
+
+<script type="module">
+  import { renderPublicNav, toast, loadingHTML, emptyHTML, errorHTML, skeletonCards } from "./js/ui.js";
+  import { getOptionalSession } from "./js/guards.js";
+  import { listPublicOpportunities, renderOpportunityCardHTML } from "./js/opportunities.js";
+  import { debounce, escapeHTML } from "./js/utils.js";
+
+  let allOpportunities = [];
+
+  function applyFilters() {
+    const search = document.getElementById("f-search").value.trim().toLowerCase();
+    const category = document.getElementById("f-category").value;
+    const status = document.getElementById("f-status").value;
+    let list = allOpportunities.filter((o) => {
+      if (category && o.category !== category) return false;
+      if (status && o.status !== status) return false;
+      if (search && !(`${o.title} ${o.productName}`.toLowerCase().includes(search))) return false;
+      return true;
+    });
+    const grid = document.getElementById("opp-grid");
+    if (list.length === 0) {
+      grid.outerHTML = `<div id="opp-grid">${emptyHTML("No opportunities match your filters yet.", { icon: "🔍" })}</div>`;
+      return;
+    }
+    grid.innerHTML = list.map((o) => renderOpportunityCardHTML(o)).join("");
+  }
+
+  async function init() {
+    const grid = document.getElementById("opp-grid");
+    grid.innerHTML = skeletonCards(6);
+    const session = await getOptionalSession();
+    renderPublicNav("opportunities", session);
+
+    const sort = document.getElementById("f-sort").value;
+    try {
+      allOpportunities = await listPublicOpportunities({ sort });
+      const categories = [...new Set(allOpportunities.map((o) => o.category).filter(Boolean))];
+      const catSelect = document.getElementById("f-category");
+      categories.forEach((c) => {
+        const opt = document.createElement("option");
+        opt.value = c; opt.textContent = c.charAt(0).toUpperCase() + c.slice(1);
+        catSelect.appendChild(opt);
+      });
+      applyFilters();
+    } catch (e) {
+      console.error(e);
+      grid.outerHTML = `<div id="opp-grid">${errorHTML("Could not load opportunities right now.")}</div>`;
+    }
+  }
+
+  document.getElementById("f-search").addEventListener("input", debounce(applyFilters, 250));
+  document.getElementById("f-category").addEventListener("change", applyFilters);
+  document.getElementById("f-status").addEventListener("change", applyFilters);
+  document.getElementById("f-sort").addEventListener("change", init);
+
+  init();
+</script>
+</body>
+</html>

@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Investments — Admin — Hunny Invests</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/dashboard.css">
+<link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+<div id="app-shell"></div>
+
+<script type="module">
+  import { requireAuth } from "./js/guards.js";
+  import { renderAppShell, loadingHTML, errorHTML, emptyHTML, statusBadge } from "./js/ui.js";
+  import { getUnreadCount } from "./js/notifications.js";
+  import { getMany, COLLECTIONS, orderBy, fsLimit } from "./js/firestore.js";
+  import { formatPKR, formatDate, debounce } from "./js/utils.js";
+
+  let all = [];
+
+  function render(filter = "") {
+    const list = filter ? all.filter((i) => i.status === filter) : all;
+    const el = document.getElementById("inv-table");
+    if (!list.length) { el.innerHTML = emptyHTML("No investments found."); return; }
+    el.innerHTML = `
+      <div class="data-table-wrap"><table class="data-table">
+        <thead><tr><th>Opportunity</th><th>Amount</th><th>Return</th><th>Status</th><th>Invested</th><th>Maturity</th></tr></thead>
+        <tbody>${list.map((i) => `<tr><td>${i.opportunityTitle || i.opportunityId}</td><td class="money">${formatPKR(i.investedAmount)}</td><td>${i.investorReturnPercent}%</td><td>${statusBadge(i.status)}</td><td>${formatDate(i.investedAt)}</td><td>${i.maturityAt ? formatDate(i.maturityAt) : "—"}</td></tr>`).join("")}</tbody>
+      </table></div>
+      <div class="record-cards">${list.map((i) => `<div class="record-card">
+        <div class="record-card__top"><span class="record-card__title">${i.opportunityTitle || i.opportunityId}</span>${statusBadge(i.status)}</div>
+        <div class="record-card__grid"><div><span>Amount</span>${formatPKR(i.investedAmount)}</div><div><span>Return</span>${i.investorReturnPercent}%</div></div>
+      </div>`).join("")}</div>`;
+  }
+
+  async function init() {
+    const session = await requireAuth(["admin", "super_admin"]);
+    if (!session) return;
+    const unreadCount = await getUnreadCount(session.user.uid);
+    const page = renderAppShell({ role: "admin", active: "admin-investments", title: "Investments", profile: session.profile, unreadCount });
+    page.innerHTML = loadingHTML("Loading investments…");
+    try {
+      all = await getMany(COLLECTIONS.INVESTMENTS, orderBy("investedAt", "desc"), fsLimit(500));
+      page.innerHTML = `
+        <div class="filter-bar">
+          <select class="input" id="status-filter">
+            <option value="">All Statuses</option>
+            <option value="invested">Invested</option>
+            <option value="active">Active</option>
+            <option value="completed">Completed</option>
+            <option value="refunded">Refunded</option>
+            <option value="exited">Exited</option>
+          </select>
+        </div>
+        <div id="inv-table"></div>`;
+      render();
+      document.getElementById("status-filter").addEventListener("change", (e) => render(e.target.value));
+    } catch (e) {
+      console.error(e);
+      page.innerHTML = errorHTML("Could not load investments.");
+    }
+  }
+
+  init();
+</script>
+</body>
+</html>

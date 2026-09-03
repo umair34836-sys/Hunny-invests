@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Settlement — Hunny Invests</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/dashboard.css">
+<link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+<div id="app-shell"></div>
+
+<script type="module">
+  import { requireAuth } from "./js/guards.js";
+  import { renderAppShell, loadingHTML, errorHTML, statusBadge, toast } from "./js/ui.js";
+  import { getOpportunity, ownerSubmitSettlement } from "./js/opportunities.js";
+  import { getSettlementsForOpportunity } from "./js/settlements.js";
+  import { getUnreadCount } from "./js/notifications.js";
+  import { formatPKR, formatDate, escapeHTML, getQueryParam } from "./js/utils.js";
+  import { calculateTotalReturnObligation } from "./js/calculations.js";
+
+  const id = getQueryParam("id");
+
+  async function init() {
+    const session = await requireAuth(["owner"]);
+    if (!session) return;
+    const unreadCount = await getUnreadCount(session.user.uid);
+    const page = renderAppShell({ role: "owner", active: "owner-opportunities", title: "Settlement", profile: session.profile, unreadCount });
+    page.innerHTML = loadingHTML("Loading…");
+
+    if (!id) { page.innerHTML = errorHTML("No opportunity specified."); return; }
+    const opp = await getOpportunity(id).catch(() => null);
+    if (!opp || opp.ownerId !== session.user.uid) { page.innerHTML = errorHTML("Opportunity not found."); return; }
+    const settlements = await getSettlementsForOpportunity(id);
+    const obligation = calculateTotalReturnObligation(opp.fundedAmount, opp.investorReturnPercent);
+
+    page.innerHTML = `
+      <a href="owner-opportunity.html?id=${id}" style="font-size:13px;">← Back to opportunity</a>
+      <div class="card" style="margin:14px 0;">
+        <div class="flex-between"><h3 class="mb-0">${escapeHTML(opp.title)}</h3>${statusBadge(opp.status)}</div>
+        <div class="kv-row"><span>Units Sold at Maturity</span><span>${opp.soldQuantity || 0}</span></div>
+        <div class="kv-row"><span>Total Investor Return Obligation</span><span class="money">${formatPKR(obligation)}</span></div>
+        <div class="kv-row"><span>Total Funded Capital</span><span>${formatPKR(opp.fundedAmount)}</span></div>
+      </div>
+
+      ${opp.status === "active" ? `<div class="alert alert--info">This opportunity hasn't matured yet. Come back after the maturity date to submit settlement.</div>` : ""}
+      ${opp.status === "matured" ? `<div class="card"><p>Ready for settlement. Submitting will notify admin to process final payouts to all investors.</p><button class="btn btn--primary" id="submit-btn">Submit for Settlement</button></div>` : ""}
+      ${opp.status === "settlement_pending" ? `<div class="alert alert--warning">Submitted — awaiting admin processing.</div>` : ""}
+      ${opp.status === "completed" ? `<div class="alert alert--success">Settlement complete.</div>` : ""}
+
+      <div class="dash-section__head" style="margin-top:20px;"><h2>Settlement Records</h2></div>
+      <div id="settlement-list"></div>`;
+
+    document.getElementById("settlement-list").innerHTML = settlements.length ? settlements.map((s) => `
+      <div class="card" style="margin-bottom:12px;">
+        <div class="kv-row"><span>Type</span><span>${escapeHTML(s.type)}</span></div>
+        <div class="kv-row"><span>Outcome</span><span>${statusBadge(s.outcome)}</span></div>
+        <div class="kv-row"><span>Investors Paid</span><span>${s.investorCount}</span></div>
+        <div class="kv-row"><span>Total Principal</span><span>${formatPKR(s.totalPrincipal)}</span></div>
+        <div class="kv-row"><span>Total Payout</span><span class="money">${formatPKR(s.totalPayout)}</span></div>
+        <div class="kv-row"><span>Processed</span><span>${s.processedAt ? formatDate(s.processedAt) : "—"}</span></div>
+      </div>`).join("") : `<p class="text-muted">No settlement has been processed yet.</p>`;
+
+    if (document.getElementById("submit-btn")) {
+      document.getElementById("submit-btn").addEventListener("click", async () => {
+        await ownerSubmitSettlement(id, session.user.uid);
+        toast("Submitted for settlement.", "success");
+        init();
+      });
+    }
+  }
+
+  init();
+</script>
+</body>
+</html>

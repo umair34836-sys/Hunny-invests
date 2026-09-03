@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stock &amp; Sales — Admin — Hunny Invests</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/dashboard.css">
+<link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+<div id="app-shell"></div>
+
+<script type="module">
+  import { requireAuth } from "./js/guards.js";
+  import { renderAppShell, loadingHTML, errorHTML, emptyHTML, toast, confirmModal } from "./js/ui.js";
+  import { getUnreadCount } from "./js/notifications.js";
+  import { getAllSales, adminReviewExpense } from "./js/sales.js";
+  import { getMany, COLLECTIONS, orderBy, fsLimit } from "./js/firestore.js";
+  import { formatPKR, formatDate, escapeHTML } from "./js/utils.js";
+
+  let currentAdminId;
+
+  async function load() {
+    const page = document.getElementById("page-content");
+    page.innerHTML = loadingHTML("Loading stock &amp; sales…");
+    try {
+      const [sales, expenses, opps] = await Promise.all([
+        getAllSales(300),
+        getMany(COLLECTIONS.EXPENSES, orderBy("createdAt", "desc"), fsLimit(300)),
+        getMany(COLLECTIONS.OPPORTUNITIES)
+      ]);
+      const oppTitle = Object.fromEntries(opps.map((o) => [o.id, o.title]));
+
+      page.innerHTML = `
+        <div class="dash-section">
+          <div class="dash-section__head"><h2>Stock Overview</h2></div>
+          <div class="data-table-wrap"><table class="data-table">
+            <thead><tr><th>Opportunity</th><th>Status</th><th>Total</th><th>Sold</th><th>Remaining</th><th>Revenue</th></tr></thead>
+            <tbody>${opps.filter((o) => ["active", "matured", "completed"].includes(o.status)).map((o) => `<tr><td>${escapeHTML(o.title)}</td><td>${escapeHTML(o.status)}</td><td>${o.stockQuantity}</td><td>${o.soldQuantity || 0}</td><td>${o.remainingQuantity}</td><td class="money">${formatPKR(o.revenueTotal)}</td></tr>`).join("")}</tbody>
+          </table></div>
+        </div>
+
+        <div class="dash-section">
+          <div class="dash-section__head"><h2>Recent Sales</h2></div>
+          <div class="record-cards">${sales.length ? sales.slice(0, 50).map((s) => `<div class="record-card">
+            <div class="record-card__top"><span class="record-card__title">${escapeHTML(oppTitle[s.opportunityId] || s.opportunityId)}</span><span class="money">${formatPKR(s.saleAmount)}</span></div>
+            <div class="record-card__meta">${s.quantity} unit(s) · ${formatDate(s.saleDate)}</div>
+          </div>`).join("") : emptyHTML("No sales recorded yet.")}</div>
+        </div>
+
+        <div class="dash-section">
+          <div class="dash-section__head"><h2>Expenses Pending Review</h2></div>
+          <div id="expenses-list"></div>
+        </div>`;
+
+      const pending = expenses.filter((e) => e.approvalStatus === "pending");
+      document.getElementById("expenses-list").innerHTML = pending.length ? pending.map((e) => `
+        <div class="record-card">
+          <div class="record-card__top"><span class="record-card__title">${escapeHTML(oppTitle[e.opportunityId] || e.opportunityId)} — ${escapeHTML(e.category)}</span><span class="money">${formatPKR(e.amount)}</span></div>
+          <div class="record-card__meta">${formatDate(e.date)}</div>
+          <p style="font-size:12.5px;margin:6px 0;">${escapeHTML(e.description || "")}</p>
+          <div class="record-card__actions">
+            <button class="btn btn--primary btn--sm approve-exp-btn" data-id="${e.id}">Approve</button>
+            <button class="btn btn--danger btn--sm reject-exp-btn" data-id="${e.id}">Reject</button>
+          </div>
+        </div>`).join("") : emptyHTML("No expenses awaiting review.", { icon: "✅" });
+
+      document.querySelectorAll(".approve-exp-btn").forEach((btn) => btn.addEventListener("click", async () => {
+        await adminReviewExpense(btn.dataset.id, currentAdminId, true);
+        toast("Expense approved.", "success"); load();
+      }));
+      document.querySelectorAll(".reject-exp-btn").forEach((btn) => btn.addEventListener("click", async () => {
+        const ok = await confirmModal("Reject this expense?", { danger: true });
+        if (!ok) return;
+        await adminReviewExpense(btn.dataset.id, currentAdminId, false);
+        toast("Expense rejected.", "success"); load();
+      }));
+    } catch (e) {
+      console.error(e);
+      page.innerHTML = errorHTML("Could not load stock &amp; sales.");
+    }
+  }
+
+  async function init() {
+    const session = await requireAuth(["admin", "super_admin"]);
+    if (!session) return;
+    currentAdminId = session.user.uid;
+    const unreadCount = await getUnreadCount(session.user.uid);
+    renderAppShell({ role: "admin", active: "admin-sales", title: "Stock & Sales", profile: session.profile, unreadCount });
+    load();
+  }
+
+  init();
+</script>
+</body>
+</html>

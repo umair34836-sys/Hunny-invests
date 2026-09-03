@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hunny Invests — Invest in Real Small Business Opportunities</title>
+<meta name="description" content="Hunny Invests is a transparent investment marketplace connecting investors with real, small-batch business opportunities in Pakistan. Fixed advertised returns, full transparency, PKR wallet.">
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/dashboard.css">
+<link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+<header id="site-header"></header>
+
+<main>
+  <section class="hero">
+    <div class="container hero__grid">
+      <div>
+        <span class="hero__badge">🇵🇰 Built for Pakistani investors</span>
+        <h1>Fund real businesses. Earn a clear, fixed return.</h1>
+        <p class="lead">Hunny Invests lets you invest small amounts of capital into real, small-batch product opportunities — like a batch of dresses or a stock lot — and earn a fixed, advertised return once the stock sells. No jargon, no hidden math.</p>
+        <div class="hero__ctas">
+          <a href="opportunities.html" class="btn btn--primary btn--lg">Browse Opportunities</a>
+          <a href="how-it-works.html" class="btn btn--ghost btn--lg">How It Works</a>
+        </div>
+        <div class="hero__stats" id="home-stats">
+          <div class="hero__stat"><strong>PKR</strong><span>Local currency, local trust</span></div>
+          <div class="hero__stat"><strong>Fixed %</strong><span>Advertised return on your capital</span></div>
+          <div class="hero__stat"><strong>100%</strong><span>Funding required before stock purchase</span></div>
+        </div>
+      </div>
+      <div class="hero__art">
+        <div class="card" style="margin-bottom:12px;">
+          <div class="flex-between"><h4 class="mb-0">Women's Dresses — Batch #001</h4><span class="badge badge--blue">Funding</span></div>
+          <p style="margin:10px 0 6px;">PKR 5,200 / PKR 7,800 funded</p>
+          <div class="progress"><div class="progress__track"><div class="progress__fill" style="width:66.67%"></div></div><span class="progress__label">67%</span></div>
+          <div class="kv-row"><span>Investor Return</span><span class="money">5%</span></div>
+          <div class="kv-row"><span>Duration</span><span>2 Months</span></div>
+          <div class="kv-row"><span>Minimum</span><span>PKR 1,000</span></div>
+        </div>
+        <p class="text-muted" style="font-size:12.5px;">Example illustration — see live opportunities in the marketplace.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section container">
+    <div class="section-head">
+      <span class="eyebrow">Why Hunny Invests</span>
+      <h2>Transparent by design</h2>
+      <p>Every opportunity shows exactly what's being funded, how returns are calculated, and what happens if sales don't go as planned.</p>
+    </div>
+    <div class="opp-grid">
+      <div class="card">
+        <h3>🔒 Locked, not lost</h3>
+        <p>Your invested capital is locked only once the opportunity is fully funded and the owner starts the investment period — never before, and never silently.</p>
+      </div>
+      <div class="card">
+        <h3>📊 Fixed advertised return</h3>
+        <p>Your return is a fixed percentage of <em>your own</em> invested amount — not a share of the business's actual profit. Example: PKR 1,000 at 5% = PKR 1,050 at maturity.</p>
+      </div>
+      <div class="card">
+        <h3>🛡️ Zero-sale protection</h3>
+        <p>If literally nothing sells by maturity, you still get your principal back, minus a small 1% fee — never a total loss from a stock-side failure.</p>
+      </div>
+      <div class="card">
+        <h3>↩️ Early exit before start</h3>
+        <p>Change your mind before the investment period begins? Exit early for a 2% fee. After the timer starts, funds are locked until maturity.</p>
+      </div>
+      <div class="card">
+        <h3>👛 Simple PKR wallet</h3>
+        <p>Deposit once, invest across many opportunities. All deposits and withdrawals are manually verified by our admin team for your safety.</p>
+      </div>
+      <div class="card">
+        <h3>📦 Real stock, real sales</h3>
+        <p>Track exactly how much stock was purchased, how much has sold, and how much remains — right up to your investment's maturity date.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" style="background:var(--color-navy); color:#fff;">
+    <div class="container text-center">
+      <h2 style="color:#fff;">Ready to explore opportunities?</h2>
+      <p style="color:#c3ccdc; max-width:520px; margin:0 auto 20px;">Create a free account, deposit funds into your wallet, and start investing in minutes.</p>
+      <div class="hero__ctas" style="justify-content:center;">
+        <a href="register.html" class="btn btn--accent btn--lg">Create Free Account</a>
+        <a href="opportunities.html" class="btn btn--ghost btn--lg" style="color:#fff; border-color:rgba(255,255,255,0.35);">View Opportunities</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section container">
+    <div class="alert alert--warning">
+      <strong>Risk notice:</strong> Investing involves risk, including possible loss of expected returns. This platform's legal and compliance framework is still evolving — please read our <a href="risk-disclosure.html">Risk Disclosure</a> and <a href="terms.html">Terms of Service</a> before investing.
+    </div>
+  </section>
+</main>
+
+<footer id="site-footer"></footer>
+
+<script type="module">
+  import { renderPublicNav, toast } from "./js/ui.js";
+  import { getOptionalSession } from "./js/guards.js";
+
+  (async () => {
+    const session = await getOptionalSession();
+    renderPublicNav("home", session);
+  })();
+</script>
+</body>
+</html>

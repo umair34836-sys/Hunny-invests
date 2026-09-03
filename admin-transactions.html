@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Transactions — Admin — Hunny Invests</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/dashboard.css">
+<link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+<div id="app-shell"></div>
+
+<script type="module">
+  import { requireAuth } from "./js/guards.js";
+  import { renderAppShell, loadingHTML, errorHTML, emptyHTML } from "./js/ui.js";
+  import { getUnreadCount } from "./js/notifications.js";
+  import { getMany, COLLECTIONS, orderBy, fsLimit } from "./js/firestore.js";
+  import { formatPKR, formatDateTime, escapeHTML, debounce } from "./js/utils.js";
+
+  let all = [];
+  function render(filter = "") {
+    const list = filter ? all.filter((t) => t.type === filter) : all;
+    const el = document.getElementById("tx-table");
+    if (!list.length) { el.innerHTML = emptyHTML("No transactions found."); return; }
+    el.innerHTML = `
+      <div class="data-table-wrap"><table class="data-table">
+        <thead><tr><th>Date</th><th>User</th><th>Type</th><th>Amount</th><th>Description</th></tr></thead>
+        <tbody>${list.map((t) => `<tr><td>${formatDateTime(t.createdAt)}</td><td style="font-size:11px;color:var(--color-text-faint);">${t.userId.slice(0, 8)}…</td><td><span class="pill-tag">${t.type}</span></td><td class="money">${formatPKR(t.amount)}</td><td>${escapeHTML(t.description || "")}</td></tr>`).join("")}</tbody>
+      </table></div>
+      <div class="record-cards">${list.map((t) => `<div class="record-card">
+        <div class="record-card__top"><span class="record-card__title">${formatPKR(t.amount)}</span><span class="pill-tag">${t.type}</span></div>
+        <div class="record-card__meta">${formatDateTime(t.createdAt)}</div>
+      </div>`).join("")}</div>`;
+  }
+
+  async function init() {
+    const session = await requireAuth(["admin", "super_admin"]);
+    if (!session) return;
+    const unreadCount = await getUnreadCount(session.user.uid);
+    const page = renderAppShell({ role: "admin", active: "admin-transactions", title: "Transactions", profile: session.profile, unreadCount });
+    page.innerHTML = loadingHTML("Loading transactions…");
+    try {
+      all = await getMany(COLLECTIONS.WALLET_TRANSACTIONS, orderBy("createdAt", "desc"), fsLimit(500));
+      page.innerHTML = `
+        <div class="filter-bar">
+          <select class="input" id="type-filter">
+            <option value="">All Types</option>
+            <option value="deposit_approved">Deposit Approved</option>
+            <option value="investment">Investment</option>
+            <option value="early_exit_fee">Early Exit</option>
+            <option value="refund">Refund</option>
+            <option value="profit">Profit</option>
+            <option value="withdrawal_approved">Withdrawal Approved</option>
+            <option value="adjustment">Adjustment</option>
+          </select>
+        </div>
+        <div id="tx-table"></div>`;
+      render();
+      document.getElementById("type-filter").addEventListener("change", (e) => render(e.target.value));
+    } catch (e) {
+      console.error(e);
+      page.innerHTML = errorHTML("Could not load transactions.");
+    }
+  }
+
+  init();
+</script>
+</body>
+</html>

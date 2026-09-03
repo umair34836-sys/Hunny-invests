@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manage Stock — Hunny Invests</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/dashboard.css">
+<link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+<div id="app-shell"></div>
+
+<script type="module">
+  import { requireAuth } from "./js/guards.js";
+  import { renderAppShell, loadingHTML, errorHTML, toast, confirmModal, emptyHTML } from "./js/ui.js";
+  import { getOpportunity } from "./js/opportunities.js";
+  import { ownerAdjustStock } from "./js/stock.js";
+  import { recordExpense, getExpensesForOpportunity, EXPENSE_CATEGORIES } from "./js/sales.js";
+  import { getUnreadCount } from "./js/notifications.js";
+  import { formatPKR, formatDate, escapeHTML, getQueryParam } from "./js/utils.js";
+
+  const id = getQueryParam("id");
+
+  async function init() {
+    const session = await requireAuth(["owner"]);
+    if (!session) return;
+    const unreadCount = await getUnreadCount(session.user.uid);
+    const page = renderAppShell({ role: "owner", active: "owner-opportunities", title: "Manage Stock & Expenses", profile: session.profile, unreadCount });
+    page.innerHTML = loadingHTML("Loading…");
+
+    if (!id) { page.innerHTML = errorHTML("No opportunity specified."); return; }
+    const opp = await getOpportunity(id).catch(() => null);
+    if (!opp || opp.ownerId !== session.user.uid) { page.innerHTML = errorHTML("Opportunity not found."); return; }
+
+    const expenses = await getExpensesForOpportunity(id);
+
+    page.innerHTML = `
+      <a href="owner-opportunity.html?id=${id}" style="font-size:13px;">← Back to opportunity</a>
+      <div class="card" style="margin:14px 0;">
+        <h3>Stock Status</h3>
+        <div class="kv-row"><span>Total Quantity</span><span>${opp.stockQuantity}</span></div>
+        <div class="kv-row"><span>Sold</span><span>${opp.soldQuantity || 0}</span></div>
+        <div class="kv-row"><span>Remaining</span><span>${opp.remainingQuantity}</span></div>
+        ${["active", "matured"].includes(opp.status) ? `
+        <div class="form-group" style="margin-top:14px;"><label class="form-label">Correct Remaining Quantity</label><input class="input" type="number" id="newRemaining" value="${opp.remainingQuantity}" min="0" max="${opp.stockQuantity}"></div>
+        <div class="form-group"><label class="form-label">Reason for adjustment</label><input class="input" id="adjustReason" placeholder="e.g. Returned item, damaged stock…"></div>
+        <div class="form-error" id="stock-error"></div>
+        <button class="btn btn--ghost" id="adjust-btn">Save Adjustment</button>` : `<p class="text-muted">Stock can be adjusted once the opportunity is active.</p>`}
+      </div>
+
+      <div class="card">
+        <h3>Record Expense</h3>
+        ${["active", "matured"].includes(opp.status) ? `
+        <div class="form-row form-row--2">
+          <div class="form-group"><label class="form-label">Category</label>
+            <select class="input" id="exp-category">${EXPENSE_CATEGORIES.map((c) => `<option value="${c}">${c}</option>`).join("")}</select>
+          </div>
+          <div class="form-group"><label class="form-label">Amount (PKR)</label><input class="input" type="number" id="exp-amount" min="0"></div>
+        </div>
+        <div class="form-group"><label class="form-label">Description</label><input class="input" id="exp-description" placeholder="e.g. Delivery charges for 5 units"></div>
+        <div class="form-group"><label class="form-label">Date</label><input class="input" type="date" id="exp-date"></div>
+        <div class="form-error" id="exp-error"></div>
+        <button class="btn btn--primary" id="add-expense-btn">Add Expense</button>
+        <hr class="divider">` : ""}
+        <div id="expenses-list"></div>
+      </div>`;
+
+    document.getElementById("expenses-list").innerHTML = expenses.length ? `
+      <div class="record-cards">${expenses.map((e) => `
+        <div class="record-card">
+          <div class="record-card__top"><span class="record-card__title">${escapeHTML(e.category)}</span><span class="money">${formatPKR(e.amount)}</span></div>
+          <div class="record-card__meta">${formatDate(e.date)} · ${escapeHTML(e.approvalStatus)}</div>
+          <p style="font-size:12.5px;margin:6px 0 0;">${escapeHTML(e.description || "")}</p>
+        </div>`).join("")}</div>` : emptyHTML("No expenses recorded yet.", { icon: "🧾" });
+
+    if (document.getElementById("adjust-btn")) {
+      document.getElementById("adjust-btn").addEventListener("click", async () => {
+        const newRemainingQuantity = Number(document.getElementById("newRemaining").value);
+        const reason = document.getElementById("adjustReason").value.trim();
+        const errorBox = document.getElementById("stock-error");
+        if (!reason) { errorBox.textContent = "Please provide a reason for this adjustment."; return; }
+        try {
+          await ownerAdjustStock(id, session.user.uid, { newRemainingQuantity, reason });
+          toast("Stock updated.", "success");
+          init();
+        } catch (e) { errorBox.textContent = e.message || "Could not update stock."; }
+      });
+    }
+    if (document.getElementById("add-expense-btn")) {
+      document.getElementById("add-expense-btn").addEventListener("click", async () => {
+        const category = document.getElementById("exp-category").value;
+        const amount = Number(document.getElementById("exp-amount").value);
+        const description = document.getElementById("exp-description").value.trim();
+        const date = document.getElementById("exp-date").value;
+        const errorBox = document.getElementById("exp-error");
+        if (!(amount > 0)) { errorBox.textContent = "Enter a valid amount."; return; }
+        try {
+          await recordExpense(id, session.user.uid, { category, amount, description, date });
+          toast("Expense recorded.", "success");
+          init();
+        } catch (e) { errorBox.textContent = e.message || "Could not record expense."; }
+      });
+    }
+  }
+
+  init();
+</script>
+</body>
+</html>
