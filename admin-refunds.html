@@ -62,7 +62,7 @@
       }));
     } catch (e) {
       console.error(e);
-      page.innerHTML = errorHTML("Could not load refunds.");
+      page.innerHTML = errorHTML("Could not load refunds.", e);
     }
   }
 

@@ -126,8 +126,29 @@ export function emptyHTML(message = "Nothing here yet.", { icon = "📭", action
   return `<div class="state-block state-block--empty"><div class="state-icon">${icon}</div><p>${escapeHTML(message)}</p>${actionHTML}</div>`;
 }
 
-export function errorHTML(message = "Something went wrong. Please try again.") {
-  return `<div class="state-block state-block--error"><div class="state-icon">⚠️</div><p>${escapeHTML(message)}</p></div>`;
+/**
+ * Render an error state. Pass the caught error as the second argument to
+ * surface a real, actionable detail beneath the friendly message — this
+ * matters a lot while the app is still being wired up (missing Firestore
+ * indexes / unpublished security rules are the two most common causes of a
+ * page silently failing to load, and both are otherwise invisible to
+ * someone without devtools open on a phone).
+ */
+export function errorHTML(message = "Something went wrong. Please try again.", error = null) {
+  let detailHTML = "";
+  if (error) {
+    const raw = (error && (error.message || String(error))) || "";
+    const indexLinkMatch = raw.match(/https:\/\/console\.firebase\.google\.com\S+/);
+    if (error.code === "failed-precondition" && indexLinkMatch) {
+      detailHTML = `<p class="error-detail">This screen needs a Firestore index that hasn't been created yet.
+        <a href="${escapeHTML(indexLinkMatch[0])}" target="_blank" rel="noopener">Tap here to create it in Firebase Console</a>, wait a minute, then reload this page.</p>`;
+    } else if (error.code === "permission-denied") {
+      detailHTML = `<p class="error-detail"><strong>permission-denied</strong> — Firestore Security Rules blocked this read. Make sure <code>firestore.rules</code> has been published in Firebase Console → Firestore Database → Rules.</p>`;
+    } else if (raw) {
+      detailHTML = `<p class="error-detail">${escapeHTML(error.code ? `${error.code}: ${raw}` : raw)}</p>`;
+    }
+  }
+  return `<div class="state-block state-block--error"><div class="state-icon">⚠️</div><p>${escapeHTML(message)}</p>${detailHTML}</div>`;
 }
 
 export function setContent(containerId, html) {

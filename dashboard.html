@@ -78,7 +78,7 @@
       }
     } catch (e) {
       console.error(e);
-      page.innerHTML = errorHTML("Could not load your dashboard.");
+      page.innerHTML = errorHTML("Could not load your dashboard.", e);
     }
   }
 

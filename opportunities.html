@@ -87,7 +87,7 @@
       applyFilters();
     } catch (e) {
       console.error(e);
-      grid.outerHTML = `<div id="opp-grid">${errorHTML("Could not load opportunities right now.")}</div>`;
+      grid.outerHTML = `<div id="opp-grid">${errorHTML("Could not load opportunities right now.", e)}</div>`;
     }
   }
 

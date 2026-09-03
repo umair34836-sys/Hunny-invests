@@ -59,7 +59,7 @@
       }));
     } catch (e) {
       console.error(e);
-      page.innerHTML = errorHTML("Could not load notifications.");
+      page.innerHTML = errorHTML("Could not load notifications.", e);
     }
   }
 

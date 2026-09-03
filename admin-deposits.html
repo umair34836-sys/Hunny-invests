@@ -82,7 +82,7 @@
       }));
     } catch (e) {
       console.error(e);
-      page.innerHTML = errorHTML("Could not load deposits.");
+      page.innerHTML = errorHTML("Could not load deposits.", e);
     }
   }
 

@@ -67,7 +67,7 @@
       }));
     } catch (e) {
       console.error(e);
-      page.innerHTML = errorHTML("Could not load your investments.");
+      page.innerHTML = errorHTML("Could not load your investments.", e);
     }
   }
 

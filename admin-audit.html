@@ -47,7 +47,7 @@
       document.getElementById("search").addEventListener("input", debounce((e) => render(e.target.value), 250));
     } catch (e) {
       console.error(e);
-      page.innerHTML = errorHTML("Could not load audit logs.");
+      page.innerHTML = errorHTML("Could not load audit logs.", e);
     }
   }
 

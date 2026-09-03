@@ -43,7 +43,7 @@
       wire();
     } catch (e) {
       console.error(e);
-      page.innerHTML = errorHTML("Could not load owners.");
+      page.innerHTML = errorHTML("Could not load owners.", e);
     }
   }
 

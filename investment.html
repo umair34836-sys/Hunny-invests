@@ -32,7 +32,7 @@
     if (!id) { page.innerHTML = errorHTML("No investment specified."); return; }
 
     let inv;
-    try { inv = await getInvestment(id); } catch (e) { page.innerHTML = errorHTML("Could not load this investment."); return; }
+    try { inv = await getInvestment(id); } catch (e) { page.innerHTML = errorHTML("Could not load this investment.", e); return; }
     if (!inv || inv.investorId !== session.user.uid) { page.innerHTML = errorHTML("Investment not found."); return; }
 
     const opp = await getOpportunity(inv.opportunityId).catch(() => null);

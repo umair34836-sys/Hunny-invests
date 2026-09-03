@@ -53,7 +53,7 @@
         </div>`;
     } catch (e) {
       console.error(e);
-      page.innerHTML = errorHTML("Could not load platform overview.");
+      page.innerHTML = errorHTML("Could not load platform overview.", e);
     }
   }
 

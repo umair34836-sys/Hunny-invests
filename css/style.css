@@ -176,6 +176,13 @@ textarea.input { resize: vertical; min-height: 90px; }
 /* ------------------------------- State blocks ------------------------------- */
 .state-block { text-align: center; padding: 48px 20px; color: var(--color-text-muted); }
 .state-icon { font-size: 36px; margin-bottom: 12px; }
+.error-detail {
+  max-width: 480px; margin: 14px auto 0; padding: 10px 14px; border-radius: var(--radius-sm);
+  background: var(--color-danger-bg); color: var(--color-danger); font-size: 12.5px;
+  word-break: break-word; text-align: left;
+}
+.error-detail a { color: var(--color-danger); text-decoration: underline; font-weight: 700; }
+.error-detail code { background: rgba(0,0,0,0.06); padding: 1px 5px; border-radius: 4px; }
 .spinner { width: 34px; height: 34px; border: 3px solid var(--color-border); border-top-color: var(--color-primary); border-radius: 50%; margin: 0 auto 14px; animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .skeleton-card { height: 110px; border-radius: var(--radius-lg); background: linear-gradient(90deg, var(--color-surface-alt) 25%, #e6eaf1 37%, var(--color-surface-alt) 63%); background-size: 400% 100%; animation: shimmer 1.4s ease infinite; margin-bottom: 14px; }

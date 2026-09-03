@@ -58,7 +58,7 @@
       wire();
     } catch (e) {
       console.error(e);
-      document.getElementById("opp-list").innerHTML = errorHTML("Could not load opportunities.");
+      document.getElementById("opp-list").innerHTML = errorHTML("Could not load opportunities.", e);
     }
   }
 

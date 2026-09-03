@@ -60,7 +60,7 @@
       document.getElementById("type-filter").addEventListener("change", (e) => render(e.target.value));
     } catch (e) {
       console.error(e);
-      page.innerHTML = errorHTML("Could not load transactions.");
+      page.innerHTML = errorHTML("Could not load transactions.", e);
     }
   }
 

@@ -82,7 +82,7 @@
       }));
     } catch (e) {
       console.error(e);
-      page.innerHTML = errorHTML("Could not load withdrawals.");
+      page.innerHTML = errorHTML("Could not load withdrawals.", e);
     }
   }
 

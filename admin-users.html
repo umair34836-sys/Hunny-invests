@@ -14,7 +14,7 @@
 <script type="module">
   import { requireAuth } from "./js/guards.js";
   import { renderAppShell, loadingHTML, errorHTML, emptyHTML, toast, confirmModal, openModal } from "./js/ui.js";
-  import { getAllUsersByRole, suspendUser, reactivateUser, grantOwnerRole } from "./js/admin.js";
+  import { getAllUsersByRole, suspendUser, reactivateUser, grantOwnerRole, adjustWallet } from "./js/admin.js";
   import { getWallet } from "./js/wallet.js";
   import { getUnreadCount } from "./js/notifications.js";
   import { formatPKR, formatDate, escapeHTML, debounce } from "./js/utils.js";
@@ -65,19 +65,61 @@
     </div>`;
   }
 
+  const WALLET_FIELDS = [
+    ["availableBalance", "Available Balance"],
+    ["lockedBalance", "Locked Balance"],
+    ["totalDeposited", "Total Deposited"],
+    ["totalInvested", "Total Invested"],
+    ["totalProfit", "Total Profit"],
+    ["totalWithdrawn", "Total Withdrawn"],
+    ["totalRefunded", "Total Refunded"]
+  ];
+
+  async function openWalletModal(userId) {
+    const wallet = await getWallet(userId);
+    openModal(`
+      <h3 class="modal-title">Wallet Summary</h3>
+      <div class="kv-row"><span>Available</span><span class="money">${formatPKR(wallet?.availableBalance)}</span></div>
+      <div class="kv-row"><span>Locked</span><span>${formatPKR(wallet?.lockedBalance)}</span></div>
+      <div class="kv-row"><span>Total Deposited</span><span>${formatPKR(wallet?.totalDeposited)}</span></div>
+      <div class="kv-row"><span>Total Invested</span><span>${formatPKR(wallet?.totalInvested)}</span></div>
+      <div class="kv-row"><span>Total Profit</span><span>${formatPKR(wallet?.totalProfit)}</span></div>
+      <div class="kv-row"><span>Total Withdrawn</span><span>${formatPKR(wallet?.totalWithdrawn)}</span></div>
+      <div class="kv-row"><span>Total Refunded</span><span>${formatPKR(wallet?.totalRefunded)}</span></div>
+      <hr class="divider">
+      <h3 class="modal-title" style="font-size:15px;">Manual Correction</h3>
+      <p class="form-hint" style="margin-bottom:10px;">Adds (or subtracts, with a negative number) an amount from one field. Every correction is logged to the audit trail — use only to fix a genuine data error.</p>
+      <div class="form-group"><label class="form-label">Field</label>
+        <select class="input" id="adj-field">${WALLET_FIELDS.map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</select>
+      </div>
+      <div class="form-row form-row--2">
+        <div class="form-group"><label class="form-label">Amount (+/-)</label><input class="input" type="number" id="adj-amount" placeholder="e.g. -500 or 500"></div>
+        <div class="form-group"><label class="form-label">Reason (required)</label><input class="input" id="adj-reason" placeholder="Why?"></div>
+      </div>
+      <div class="form-error" id="adj-error"></div>
+      <button class="btn btn--danger btn--block" id="adj-submit-btn">Apply Correction</button>
+    `);
+    document.getElementById("adj-submit-btn").addEventListener("click", async () => {
+      const field = document.getElementById("adj-field").value;
+      const amount = Number(document.getElementById("adj-amount").value);
+      const reason = document.getElementById("adj-reason").value.trim();
+      const errorBox = document.getElementById("adj-error");
+      if (!amount) { errorBox.textContent = "Enter a non-zero amount."; return; }
+      if (!reason) { errorBox.textContent = "A reason is required for every manual correction."; return; }
+      const ok = await confirmModal(`Apply ${amount > 0 ? "+" : ""}${amount} to ${field}? This directly changes real wallet data.`, { title: "Confirm Correction", confirmText: "Apply", danger: true });
+      if (!ok) return;
+      try {
+        await adjustWallet(userId, currentAdminId, { field, amount, reason });
+        toast("Wallet corrected.", "success");
+        load();
+      } catch (e) {
+        errorBox.textContent = e.message || "Could not apply correction.";
+      }
+    });
+  }
+
   function wire() {
-    document.querySelectorAll(".view-wallet-btn").forEach((btn) => btn.addEventListener("click", async () => {
-      const wallet = await getWallet(btn.dataset.id);
-      openModal(`
-        <h3 class="modal-title">Wallet Summary</h3>
-        <div class="kv-row"><span>Available</span><span class="money">${formatPKR(wallet?.availableBalance)}</span></div>
-        <div class="kv-row"><span>Locked</span><span>${formatPKR(wallet?.lockedBalance)}</span></div>
-        <div class="kv-row"><span>Total Deposited</span><span>${formatPKR(wallet?.totalDeposited)}</span></div>
-        <div class="kv-row"><span>Total Invested</span><span>${formatPKR(wallet?.totalInvested)}</span></div>
-        <div class="kv-row"><span>Total Profit</span><span>${formatPKR(wallet?.totalProfit)}</span></div>
-        <div class="kv-row"><span>Total Withdrawn</span><span>${formatPKR(wallet?.totalWithdrawn)}</span></div>
-        <div class="kv-row"><span>Total Refunded</span><span>${formatPKR(wallet?.totalRefunded)}</span></div>`);
-    }));
+    document.querySelectorAll(".view-wallet-btn").forEach((btn) => btn.addEventListener("click", () => openWalletModal(btn.dataset.id)));
     document.querySelectorAll(".grant-owner-btn").forEach((btn) => btn.addEventListener("click", async () => {
       const ok = await confirmModal("Grant owner access to this user? They will be able to create investment opportunities.", { title: "Grant Owner Access" });
       if (!ok) return;
@@ -113,7 +155,7 @@
       document.getElementById("search").addEventListener("input", debounce((e) => render(e.target.value), 250));
     } catch (e) {
       console.error(e);
-      page.innerHTML = errorHTML("Could not load investors.");
+      page.innerHTML = errorHTML("Could not load investors.", e);
     }
   }
 

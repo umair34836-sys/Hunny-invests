@@ -93,7 +93,7 @@
       }));
     } catch (e) {
       console.error(e);
-      page.innerHTML = errorHTML("Could not load your wallet.");
+      page.innerHTML = errorHTML("Could not load your wallet.", e);
     }
   }
 

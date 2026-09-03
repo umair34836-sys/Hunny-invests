@@ -51,7 +51,7 @@
           </div>`).join("")}</div>`;
     } catch (e) {
       console.error(e);
-      page.innerHTML = errorHTML("Could not load your transactions.");
+      page.innerHTML = errorHTML("Could not load your transactions.", e);
     }
   }
 

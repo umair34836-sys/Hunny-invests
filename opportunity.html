@@ -112,7 +112,7 @@
     let opp;
     try {
       opp = await getOpportunity(id);
-    } catch (e) { content.innerHTML = errorHTML("Could not load this opportunity."); return; }
+    } catch (e) { content.innerHTML = errorHTML("Could not load this opportunity.", e); return; }
     if (!opp) { content.innerHTML = errorHTML("Opportunity not found."); return; }
 
     const progress = calculateFundingProgress(opp.fundedAmount, opp.requiredCapital);

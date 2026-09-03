@@ -230,7 +230,33 @@ please read them before trusting this build with real money at scale:
   as a participation *record* (`stockSharePercent` on each investment), not
   a guarantee of physical delivery — per spec §13.
 
-## 9. Local Development
+## 9. Troubleshooting
+
+**"Could not load your dashboard" (or any list page) right after logging in.**
+Every dashboard/list page now shows the underlying error beneath the message
+— reload the page and read the red detail box. The two causes that produce
+this on a fresh setup:
+
+- **Missing Firestore index.** Detail box says `failed-precondition` and
+  includes a **"Tap here to create it in Firebase Console"** link — click
+  it, wait ~1 minute for the index to finish building, then reload. This
+  happens because several pages filter *and* sort (e.g. "my investments,
+  newest first"), which Firestore requires a composite index for; see
+  `firestore.indexes.json` and § 5 above. Deploying that file up front via
+  `firebase deploy --only firestore:indexes` (or creating the indexes it
+  lists manually in Firebase Console → Firestore Database → Indexes) avoids
+  hitting this one-by-one.
+- **Firestore rules not published.** Detail box says `permission-denied`.
+  Firebase Console → Firestore Database → Rules → paste in `firestore.rules`
+  → **Publish**. A brand-new Firestore database denies all reads/writes
+  until rules are published.
+
+**A page is blank / stuck loading forever.** Open the browser's dev tools
+console (or the debug view in Chrome for Android: `chrome://inspect` from a
+desktop Chrome connected via USB) — a network or module-loading error will
+be logged there.
+
+## 10. Local Development
 
 No build tooling required. Serve the folder with any static file server and
 open it in a browser, e.g.:
