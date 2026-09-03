@@ -6,8 +6,9 @@
 
 import {
   COLLECTIONS, getOne, getMany, createDoc, updateDocById,
-  where, orderBy, fsLimit, serverTimestamp
+  where, serverTimestamp
 } from "./firestore.js";
+import { sortByField } from "./utils.js";
 
 export async function getWallet(userId) {
   return getOne(COLLECTIONS.WALLETS, userId);
@@ -32,7 +33,8 @@ export async function cancelDepositRequest(depositId) {
 }
 
 export async function getUserDepositRequests(userId, max = 50) {
-  return getMany(COLLECTIONS.DEPOSIT_REQUESTS, where("userId", "==", userId), orderBy("requestedAt", "desc"), fsLimit(max));
+  const items = await getMany(COLLECTIONS.DEPOSIT_REQUESTS, where("userId", "==", userId));
+  return sortByField(items, "requestedAt", "desc", max);
 }
 
 export async function createWithdrawalRequest({ userId, amount, availableBalance, paymentMethod, accountTitle, accountNumber }) {
@@ -57,7 +59,8 @@ export async function cancelWithdrawalRequest(withdrawalId) {
 }
 
 export async function getUserWithdrawalRequests(userId, max = 50) {
-  return getMany(COLLECTIONS.WITHDRAWAL_REQUESTS, where("userId", "==", userId), orderBy("requestedAt", "desc"), fsLimit(max));
+  const items = await getMany(COLLECTIONS.WITHDRAWAL_REQUESTS, where("userId", "==", userId));
+  return sortByField(items, "requestedAt", "desc", max);
 }
 
 /** Sum of the user's currently-pending withdrawal requests (to avoid over-requesting). */
@@ -67,5 +70,6 @@ export async function getPendingWithdrawalTotal(userId) {
 }
 
 export async function getUserWalletTransactions(userId, max = 100) {
-  return getMany(COLLECTIONS.WALLET_TRANSACTIONS, where("userId", "==", userId), orderBy("createdAt", "desc"), fsLimit(max));
+  const items = await getMany(COLLECTIONS.WALLET_TRANSACTIONS, where("userId", "==", userId));
+  return sortByField(items, "createdAt", "desc", max);
 }

@@ -2,8 +2,9 @@
 
 import {
   COLLECTIONS, createDoc, getMany, updateDocById, docRef, updateDoc,
-  query, where, orderBy, fsLimit, col, getDocs, serverTimestamp
+  query, where, col, getDocs, serverTimestamp
 } from "./firestore.js";
+import { sortByField } from "./utils.js";
 
 /** Create a notification for a specific user. */
 export async function notifyUser(userId, { type, title, message, link = null, relatedId = null }) {
@@ -30,12 +31,8 @@ export async function notifyAdmins(adminIds, payload) {
 }
 
 export async function getUserNotifications(userId, max = 50) {
-  return getMany(
-    COLLECTIONS.NOTIFICATIONS,
-    where("userId", "==", userId),
-    orderBy("createdAt", "desc"),
-    fsLimit(max)
-  );
+  const items = await getMany(COLLECTIONS.NOTIFICATIONS, where("userId", "==", userId));
+  return sortByField(items, "createdAt", "desc", max);
 }
 
 export async function getUnreadCount(userId) {

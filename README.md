@@ -125,13 +125,20 @@ the actual access-control boundary (see `firestore.rules`).
 
 ## 5. Firestore Indexes
 
-`firestore.indexes.json` lists every composite index the app's queries need
-(deposit/withdrawal history, investments by investor/opportunity, opportunity
-listings by status/owner, notifications, audit trail, sales/expenses per
-opportunity, etc.). Deploy them with the Firebase CLI command above, or let
-Firestore prompt you per-query the first time you hit a missing index (each
-error includes a one-click "create index" link — convenient during manual
-testing).
+**None required.** Every list query in the app (deposit/withdrawal history,
+investments by investor/opportunity, opportunity listings by status/owner,
+notifications, audit trail, sales/expenses per opportunity, etc.) filters
+with `where()` only and sorts client-side (`sortByField()` in `js/utils.js`)
+instead of using Firestore's `orderBy()` alongside a filter. Firestore only
+requires a manually-created composite index when a query combines a filter
+with a sort on a different field (or a range filter) — a pure `where()`
+query, even with several equality clauses, always works off Firestore's
+automatic single-field indexes with zero setup. This was a deliberate
+choice so the app works immediately after Auth + Firestore + Rules are set
+up, with no per-query index click-through required.
+`firestore.indexes.json` is kept (empty) only so `firebase deploy --only
+firestore:indexes` has something valid to run if you add a filter+sort
+query later.
 
 ## 6. Test / Admin Setup Instructions
 
@@ -233,23 +240,20 @@ please read them before trusting this build with real money at scale:
 ## 9. Troubleshooting
 
 **"Could not load your dashboard" (or any list page) right after logging in.**
-Every dashboard/list page now shows the underlying error beneath the message
-— reload the page and read the red detail box. The two causes that produce
-this on a fresh setup:
+Every dashboard/list page shows the underlying error beneath the message —
+reload the page and read the red detail box. As of this version no page
+needs a Firestore composite index (see § 5), so in practice this now means
+one thing:
 
-- **Missing Firestore index.** Detail box says `failed-precondition` and
-  includes a **"Tap here to create it in Firebase Console"** link — click
-  it, wait ~1 minute for the index to finish building, then reload. This
-  happens because several pages filter *and* sort (e.g. "my investments,
-  newest first"), which Firestore requires a composite index for; see
-  `firestore.indexes.json` and § 5 above. Deploying that file up front via
-  `firebase deploy --only firestore:indexes` (or creating the indexes it
-  lists manually in Firebase Console → Firestore Database → Indexes) avoids
-  hitting this one-by-one.
 - **Firestore rules not published.** Detail box says `permission-denied`.
   Firebase Console → Firestore Database → Rules → paste in `firestore.rules`
   → **Publish**. A brand-new Firestore database denies all reads/writes
-  until rules are published.
+  until rules are published — this is the single most common reason a
+  freshly-deployed copy of this app fails to load anything after login.
+
+If the detail box ever *does* say `failed-precondition` with a "create this
+index" link (e.g. after you add a new filter+sort query of your own),
+follow that link, wait ~1 minute, then reload.
 
 **A page is blank / stuck loading forever.** Open the browser's dev tools
 console (or the debug view in Chrome for Android: `chrome://inspect` from a

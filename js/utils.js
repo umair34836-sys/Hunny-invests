@@ -78,6 +78,25 @@ export function addDays(date, days) {
   return d;
 }
 
+/**
+ * Sort a list client-side by a date-like or numeric field, then optionally
+ * cap it to `max` items. Used instead of Firestore's orderBy() so list
+ * queries only need a single-field where() clause — no composite Firestore
+ * index has to be manually created for the app to work. Fine at the data
+ * volumes this MVP targets; revisit if a collection grows very large.
+ */
+export function sortByField(list, field, direction = "desc", max = null) {
+  const mult = direction === "asc" ? 1 : -1;
+  const sorted = [...list].sort((a, b) => {
+    let av = a?.[field];
+    let bv = b?.[field];
+    av = av && typeof av === "object" ? (toDate(av)?.getTime() ?? 0) : Number(av) || 0;
+    bv = bv && typeof bv === "object" ? (toDate(bv)?.getTime() ?? 0) : Number(bv) || 0;
+    return (av - bv) * mult;
+  });
+  return max ? sorted.slice(0, max) : sorted;
+}
+
 /** Simple client-generated ID (used only for local temp keys, not security-relevant). */
 export function generateId(prefix = "id") {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
