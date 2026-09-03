@@ -1,0 +1,165 @@
+You are a senior full-stack web developer. I am providing you with a project specification file and my Firebase configuration. Read the specification file completely first, then build the website according to it.
+
+MAIN INSTRUCTIONS
+
+Build the complete Investment Opportunity Platform described in the provided specification file.
+
+Do NOT redesign, simplify, remove, or change the core business logic from the specification.
+
+TECH STACK
+
+- HTML5
+- CSS3
+- Vanilla JavaScript ES Modules
+- Firebase Authentication
+- Firebase Firestore
+- Firebase SDK v12.18.0
+- GitHub Pages compatible
+- Mobile-first responsive design
+- PKR currency
+- No Node.js
+- No PHP
+- No MySQL
+- No MongoDB
+- No Supabase
+- No Firebase Storage
+- No Firebase Cloud Functions
+
+FIREBASE CONFIG
+
+Use this exact Firebase configuration:
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDnKFkNOeHqMC_8MC-KDnZvlRClezP-GGQ",
+  authDomain: "investment-platform-31cbf.firebaseapp.com",
+  projectId: "investment-platform-31cbf",
+  storageBucket: "investment-platform-31cbf.firebasestorage.app",
+  messagingSenderId: "457748349619",
+  appId: "1:457748349619:web:367cd239d85dd5c0c6e6c6"
+};
+
+Initialize Firebase using Firebase SDK v12.18.0.
+
+Use Firebase Authentication + Firestore only.
+
+IMPORTANT BUSINESS LOGIC
+
+Follow the specification exactly.
+
+Investor:
+
+- Deposits money into wallet.
+- Invests from wallet.
+- Invested money becomes locked.
+- Investment starts ONLY after opportunity reaches 100% funding AND owner marks stock as purchased/start investment.
+- Investor return is a fixed percentage of their invested amount.
+- Example: Rs.1,000 at 5% = Rs.50 profit = Rs.1,050 payout.
+- It is NOT a percentage of actual business profit.
+- If zero products are sold by maturity, return principal minus 1%.
+- Before investment starts, early refund is allowed with 2% deduction.
+- After investment starts, investor cannot withdraw/exit until maturity.
+- Investor can see proportional stock participation.
+
+Owner:
+
+- Creates opportunities.
+- Sets required capital, minimum/maximum investment, return %, duration and stock details.
+- Cannot purchase/start stock before 100% funding.
+- Can manually update stock, sales and expenses.
+- Can start investment after stock purchase.
+- Owner can manage their own opportunities.
+
+Admin:
+
+- Full platform control.
+- Manually approve deposits.
+- Manually process withdrawals/refunds.
+- Manage users, owners, opportunities, investments, transactions and settlements.
+- Owner access/role can be manually granted through Firebase/admin controls.
+
+SECURITY
+
+Create proper Firestore Security Rules.
+
+Never allow normal users to directly modify:
+
+- wallet balance
+- investment amount
+- payout
+- profit
+- roles
+- other users' financial records
+- admin data
+
+Frontend restrictions are NOT security.
+
+Because Cloud Functions are not being used, sensitive financial operations should use controlled admin workflows.
+
+UI
+
+Create a premium, modern and trustworthy Fintech + Ecommerce interface.
+
+Must be:
+
+- Mobile-first
+- Fully responsive
+- Clean
+- Fast
+- Professional
+- Easy for Pakistani users
+- PKR formatting
+- Proper loading states
+- Empty states
+- Error states
+- Toasts
+- Modals
+- Progress bars
+- Investment status badges
+- Dashboard cards
+- Tables on desktop and cards on mobile
+
+DEVELOPMENT RULE
+
+Do not just create a demo/mockup.
+
+Build the actual working Firebase-powered application with:
+
+- Authentication
+- Firestore database
+- User roles
+- Wallet
+- Deposits
+- Withdrawals
+- Opportunities
+- Investments
+- Stock tracking
+- Sales
+- Expenses
+- Settlements
+- Notifications
+- Admin dashboard
+- Owner dashboard
+- Investor dashboard
+- Audit logs
+- Security rules
+
+Use the provided specification file as the single source of truth for all remaining details.
+
+START NOW
+
+First analyze the specification file and create the complete project structure.
+
+Then implement the application step-by-step.
+
+Do not ask unnecessary questions. If something is not explicitly specified, choose a sensible scalable solution that fits the existing architecture.
+
+At the end, provide:
+
+1. Complete project files
+2. Firestore Security Rules
+3. Firebase setup instructions
+4. GitHub Pages deployment instructions
+5. Any required Firestore indexes
+6. Test/admin setup instructions
+
+Build it as a production-ready scalable MVP, not a simple prototype.
