@@ -2,8 +2,9 @@
 
 import {
   COLLECTIONS, getOne, getMany, createDoc, updateDocById,
-  where, orderBy, serverTimestamp, writeAuditLog
+  where, serverTimestamp, writeAuditLog
 } from "./firestore.js";
+import { sortByField } from "./utils.js";
 
 /** Owner manually corrects remaining stock (e.g. damaged/returned items). Always audited. */
 export async function ownerAdjustStock(opportunityId, ownerId, { newRemainingQuantity, reason }) {
@@ -46,5 +47,6 @@ export async function createStockItem(opportunityId, ownerId, { name, quantity, 
 }
 
 export async function getStockItems(opportunityId) {
-  return getMany(COLLECTIONS.STOCK_ITEMS, where("opportunityId", "==", opportunityId), orderBy("createdAt", "desc"));
+  const items = await getMany(COLLECTIONS.STOCK_ITEMS, where("opportunityId", "==", opportunityId));
+  return sortByField(items, "createdAt", "desc");
 }

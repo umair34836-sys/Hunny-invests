@@ -9,7 +9,7 @@ import {
   COLLECTIONS, getOne, getMany, createDoc, updateDocById,
   where, orderBy, fsLimit, serverTimestamp, writeAuditLog
 } from "./firestore.js";
-import { slugify, addDays, formatPKR, formatPercent, escapeHTML, isValidImageUrl } from "./utils.js";
+import { slugify, addDays, formatPKR, formatPercent, escapeHTML, isValidImageUrl, sortByField } from "./utils.js";
 import { notifyUser, notifyUsers, getAdminUserIds } from "./notifications.js";
 import { calculateFundingProgress } from "./calculations.js";
 import { statusBadge, progressBar } from "./ui.js";
@@ -28,20 +28,24 @@ export async function getOpportunityBySlug(slug) {
 export async function listPublicOpportunities({ category, sort = "newest" } = {}) {
   const clauses = [where("status", "in", ["funding", "awaiting_stock_purchase", "active", "matured", "completed"])];
   if (category) clauses.push(where("category", "==", category));
-  clauses.push(orderBy(sort === "ending_soon" ? "fundingDeadline" : "createdAt", sort === "ending_soon" ? "asc" : "desc"));
-  clauses.push(fsLimit(100));
-  return getMany(COLLECTIONS.OPPORTUNITIES, ...clauses);
+  // No orderBy() here on purpose — see sortByField() in utils.js: keeps this
+  // query to single-field/equality filters only, so it never needs a
+  // manually-created Firestore composite index.
+  const items = await getMany(COLLECTIONS.OPPORTUNITIES, ...clauses);
+  return sortByField(items, sort === "ending_soon" ? "fundingDeadline" : "createdAt", sort === "ending_soon" ? "asc" : "desc", 100);
 }
 
 export async function listOwnerOpportunities(ownerId) {
-  return getMany(COLLECTIONS.OPPORTUNITIES, where("ownerId", "==", ownerId), orderBy("createdAt", "desc"));
+  const items = await getMany(COLLECTIONS.OPPORTUNITIES, where("ownerId", "==", ownerId));
+  return sortByField(items, "createdAt", "desc");
 }
 
 export async function listOpportunitiesByStatus(status, max = 200) {
   if (status === "all" || !status) {
     return getMany(COLLECTIONS.OPPORTUNITIES, orderBy("createdAt", "desc"), fsLimit(max));
   }
-  return getMany(COLLECTIONS.OPPORTUNITIES, where("status", "==", status), orderBy("createdAt", "desc"), fsLimit(max));
+  const items = await getMany(COLLECTIONS.OPPORTUNITIES, where("status", "==", status));
+  return sortByField(items, "createdAt", "desc", max);
 }
 
 export async function createOpportunityDraft(ownerId, data) {

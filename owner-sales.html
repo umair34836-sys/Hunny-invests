@@ -31,7 +31,15 @@
     if (!id) { page.innerHTML = errorHTML("No opportunity specified."); return; }
     const opp = await getOpportunity(id).catch(() => null);
     if (!opp || opp.ownerId !== session.user.uid) { page.innerHTML = errorHTML("Opportunity not found."); return; }
-    const sales = await getSalesForOpportunity(id);
+
+    let sales;
+    try {
+      sales = await getSalesForOpportunity(id);
+    } catch (e) {
+      console.error(e);
+      page.innerHTML = errorHTML("Could not load sales history.", e);
+      return;
+    }
 
     page.innerHTML = `
       <a href="owner-opportunity.html?id=${id}" style="font-size:13px;">← Back to opportunity</a>

@@ -17,9 +17,9 @@
     <p>Questions about a deposit, withdrawal, or an opportunity? Reach out and our admin team will get back to you.</p>
   </div>
 
-  <div class="card" style="margin-bottom:20px;">
-    <div class="kv-row"><span>Support Email</span><span>support@hunnyinvests.pk</span></div>
-    <div class="kv-row"><span>WhatsApp Support</span><span>+92 300 0000000</span></div>
+  <div class="card" style="margin-bottom:20px;" id="support-card">
+    <div class="kv-row"><span>Support Email</span><span>Hunnycollectionpk@gmail.com</span></div>
+    <div class="kv-row"><span>WhatsApp Support</span><span>+1 6396367849</span></div>
     <div class="kv-row"><span>Response Time</span><span>Within 24 hours</span></div>
   </div>
 
@@ -34,14 +34,26 @@
 <script type="module">
   import { renderPublicNav, toast } from "./js/ui.js";
   import { getOptionalSession } from "./js/guards.js";
-  import { createDoc, COLLECTIONS, serverTimestamp } from "./js/firestore.js";
+  import { createDoc, getOne, COLLECTIONS, serverTimestamp } from "./js/firestore.js";
   import { isNonEmpty, validateForm } from "./js/validators.js";
+  import { escapeHTML } from "./js/utils.js";
 
   const area = document.getElementById("contact-form-area");
 
   async function init() {
     const session = await getOptionalSession();
     renderPublicNav("contact", session);
+
+    // Keep this in sync with admin-settings.html — support contact info is
+    // admin-editable there instead of hardcoded here.
+    getOne(COLLECTIONS.PLATFORM_SETTINGS, "general").then((settings) => {
+      if (!settings) return;
+      const card = document.getElementById("support-card");
+      card.innerHTML = `
+        <div class="kv-row"><span>Support Email</span><span>${escapeHTML(settings.supportEmail || "Hunnycollectionpk@gmail.com")}</span></div>
+        <div class="kv-row"><span>WhatsApp Support</span><span>${escapeHTML(settings.supportPhone || "+1 6396367849")}</span></div>
+        <div class="kv-row"><span>Response Time</span><span>Within 24 hours</span></div>`;
+    }).catch(() => { /* keep the static fallback already rendered */ });
 
     if (!session.user) {
       area.innerHTML = `<p class="text-muted">Please <a href="login.html?redirect=contact.html">log in</a> to send a support message directly, or email us using the address above.</p>`;

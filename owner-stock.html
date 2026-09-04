@@ -33,7 +33,14 @@
     const opp = await getOpportunity(id).catch(() => null);
     if (!opp || opp.ownerId !== session.user.uid) { page.innerHTML = errorHTML("Opportunity not found."); return; }
 
-    const expenses = await getExpensesForOpportunity(id);
+    let expenses;
+    try {
+      expenses = await getExpensesForOpportunity(id);
+    } catch (e) {
+      console.error(e);
+      page.innerHTML = errorHTML("Could not load expenses.", e);
+      return;
+    }
 
     page.innerHTML = `
       <a href="owner-opportunity.html?id=${id}" style="font-size:13px;">← Back to opportunity</a>

@@ -68,7 +68,7 @@
       }));
     } catch (e) {
       console.error(e);
-      page.innerHTML = errorHTML("Could not load your opportunities.");
+      page.innerHTML = errorHTML("Could not load your opportunities.", e);
     }
   }
 

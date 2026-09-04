@@ -59,7 +59,7 @@
       document.getElementById("status-filter").addEventListener("change", (e) => render(e.target.value));
     } catch (e) {
       console.error(e);
-      page.innerHTML = errorHTML("Could not load investments.");
+      page.innerHTML = errorHTML("Could not load investments.", e);
     }
   }
 

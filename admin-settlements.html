@@ -66,7 +66,7 @@
       }));
     } catch (e) {
       console.error(e);
-      page.innerHTML = errorHTML("Could not load settlements.");
+      page.innerHTML = errorHTML("Could not load settlements.", e);
     }
   }
 

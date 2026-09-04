@@ -51,7 +51,7 @@
         : emptyHTML("You haven't created any opportunities yet.", { icon: "📦", actionHTML: '<a href="owner-create-opportunity.html" class="btn btn--primary btn--sm">Create Your First Opportunity</a>' });
     } catch (e) {
       console.error(e);
-      page.innerHTML = errorHTML("Could not load your dashboard.");
+      page.innerHTML = errorHTML("Could not load your dashboard.", e);
     }
   }
 

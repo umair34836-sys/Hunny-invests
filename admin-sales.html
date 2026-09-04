@@ -78,7 +78,7 @@
       }));
     } catch (e) {
       console.error(e);
-      page.innerHTML = errorHTML("Could not load stock &amp; sales.");
+      page.innerHTML = errorHTML("Could not load stock &amp; sales.", e);
     }
   }
 

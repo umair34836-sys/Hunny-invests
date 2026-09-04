@@ -5,7 +5,7 @@ import {
   COLLECTIONS, getOne, getMany, createDoc, updateDocById,
   where, orderBy, fsLimit, serverTimestamp, writeAuditLog, increment
 } from "./firestore.js";
-import { round2 } from "./utils.js";
+import { round2, sortByField } from "./utils.js";
 
 /* ----------------------------------- Sales ---------------------------------- */
 
@@ -72,7 +72,8 @@ export async function editSale(saleId, ownerId, { saleAmount, notes }) {
 }
 
 export async function getSalesForOpportunity(opportunityId) {
-  return getMany(COLLECTIONS.SALES, where("opportunityId", "==", opportunityId), orderBy("createdAt", "desc"));
+  const items = await getMany(COLLECTIONS.SALES, where("opportunityId", "==", opportunityId));
+  return sortByField(items, "createdAt", "desc");
 }
 
 export async function getAllSales(max = 200) {
@@ -104,7 +105,8 @@ export async function recordExpense(opportunityId, ownerId, { category, amount, 
 }
 
 export async function getExpensesForOpportunity(opportunityId) {
-  return getMany(COLLECTIONS.EXPENSES, where("opportunityId", "==", opportunityId), orderBy("createdAt", "desc"));
+  const items = await getMany(COLLECTIONS.EXPENSES, where("opportunityId", "==", opportunityId));
+  return sortByField(items, "createdAt", "desc");
 }
 
 /** Admin reviews/approves an expense; expenses are immutable to the owner once settled (spec §19). */

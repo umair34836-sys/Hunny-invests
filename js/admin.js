@@ -8,7 +8,7 @@ import {
   COLLECTIONS, docRef, col, doc, runTransaction, serverTimestamp,
   getMany, getOne, where, orderBy, fsLimit, updateDocById, writeAuditLog
 } from "./firestore.js";
-import { round2 } from "./utils.js";
+import { round2, sortByField } from "./utils.js";
 import { notifyUser } from "./notifications.js";
 import { ROLES } from "./auth.js";
 
@@ -77,7 +77,8 @@ export async function rejectDeposit(depositId, adminId, reason) {
 }
 
 export async function getPendingDeposits() {
-  return getMany(COLLECTIONS.DEPOSIT_REQUESTS, where("status", "==", "pending"), orderBy("requestedAt", "asc"));
+  const items = await getMany(COLLECTIONS.DEPOSIT_REQUESTS, where("status", "==", "pending"));
+  return sortByField(items, "requestedAt", "asc");
 }
 
 export async function getAllDeposits(max = 300) {
@@ -152,7 +153,8 @@ export async function rejectWithdrawal(withdrawalId, adminId, reason) {
 }
 
 export async function getPendingWithdrawals() {
-  return getMany(COLLECTIONS.WITHDRAWAL_REQUESTS, where("status", "==", "pending"), orderBy("requestedAt", "asc"));
+  const items = await getMany(COLLECTIONS.WITHDRAWAL_REQUESTS, where("status", "==", "pending"));
+  return sortByField(items, "requestedAt", "asc");
 }
 
 export async function getAllWithdrawals(max = 300) {
@@ -162,7 +164,8 @@ export async function getAllWithdrawals(max = 300) {
 /* ------------------------------ Users & Owners ------------------------------- */
 
 export async function getAllUsersByRole(role) {
-  return getMany(COLLECTIONS.USERS, where("role", "==", role), orderBy("createdAt", "desc"));
+  const items = await getMany(COLLECTIONS.USERS, where("role", "==", role));
+  return sortByField(items, "createdAt", "desc");
 }
 
 export async function grantOwnerRole(userId, adminId) {

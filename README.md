@@ -125,13 +125,20 @@ the actual access-control boundary (see `firestore.rules`).
 
 ## 5. Firestore Indexes
 
-`firestore.indexes.json` lists every composite index the app's queries need
-(deposit/withdrawal history, investments by investor/opportunity, opportunity
-listings by status/owner, notifications, audit trail, sales/expenses per
-opportunity, etc.). Deploy them with the Firebase CLI command above, or let
-Firestore prompt you per-query the first time you hit a missing index (each
-error includes a one-click "create index" link — convenient during manual
-testing).
+**None required.** Every list query in the app (deposit/withdrawal history,
+investments by investor/opportunity, opportunity listings by status/owner,
+notifications, audit trail, sales/expenses per opportunity, etc.) filters
+with `where()` only and sorts client-side (`sortByField()` in `js/utils.js`)
+instead of using Firestore's `orderBy()` alongside a filter. Firestore only
+requires a manually-created composite index when a query combines a filter
+with a sort on a different field (or a range filter) — a pure `where()`
+query, even with several equality clauses, always works off Firestore's
+automatic single-field indexes with zero setup. This was a deliberate
+choice so the app works immediately after Auth + Firestore + Rules are set
+up, with no per-query index click-through required.
+`firestore.indexes.json` is kept (empty) only so `firebase deploy --only
+firestore:indexes` has something valid to run if you add a filter+sort
+query later.
 
 ## 6. Test / Admin Setup Instructions
 
@@ -204,7 +211,32 @@ Auth UID → Grant Admin Access.
   decimal places at every step (a documented, simpler alternative to
   integer-paisa storage, per the spec's explicit allowance in §31).
 
-## 8. Known Limitations & Production Notes
+## 8. Monetization (Google AdSense)
+
+The platform earns from passive display ads shown to visitors — not from
+paying/rewarding users for watching ads. That "watch an ad, get credited"
+model was deliberately left out: with no backend (Firestore rules are the
+only access control here), a client-side "ad finished" event can be faked
+from the browser console with nothing to catch it. Passive ads have no such
+risk since the ad network itself validates impressions/clicks.
+
+Ad slots already exist in the code (footer on every public page, plus one
+inline slot each on the homepage and the opportunities list) and render
+nothing until you configure a real AdSense account:
+
+1. Sign up at <https://www.google.com/adsense> and get this site approved.
+2. In `js/ads.js`, replace `ADSENSE_CLIENT` with your real
+   `ca-pub-XXXXXXXXXXXXXXXX` publisher ID.
+3. Replace the placeholder values in `AD_SLOTS` (same file) with real ad
+   unit IDs from your AdSense dashboard (Ads → By ad unit → Display ads).
+4. Replace the placeholder `pub-` id in `/ads.txt` (repo root) with the same
+   publisher ID — AdSense requires this file to list the domain as an
+   authorized seller.
+
+Once step 2 is done, ad slots activate automatically everywhere they're
+already placed — no further code changes needed to go live.
+
+## 9. Known Limitations & Production Notes
 
 This mirrors the specification's own stated limitations (§27/§37/§38) —
 please read them before trusting this build with real money at scale:
@@ -230,7 +262,30 @@ please read them before trusting this build with real money at scale:
   as a participation *record* (`stockSharePercent` on each investment), not
   a guarantee of physical delivery — per spec §13.
 
-## 9. Local Development
+## 10. Troubleshooting
+
+**"Could not load your dashboard" (or any list page) right after logging in.**
+Every dashboard/list page shows the underlying error beneath the message —
+reload the page and read the red detail box. As of this version no page
+needs a Firestore composite index (see § 5), so in practice this now means
+one thing:
+
+- **Firestore rules not published.** Detail box says `permission-denied`.
+  Firebase Console → Firestore Database → Rules → paste in `firestore.rules`
+  → **Publish**. A brand-new Firestore database denies all reads/writes
+  until rules are published — this is the single most common reason a
+  freshly-deployed copy of this app fails to load anything after login.
+
+If the detail box ever *does* say `failed-precondition` with a "create this
+index" link (e.g. after you add a new filter+sort query of your own),
+follow that link, wait ~1 minute, then reload.
+
+**A page is blank / stuck loading forever.** Open the browser's dev tools
+console (or the debug view in Chrome for Android: `chrome://inspect` from a
+desktop Chrome connected via USB) — a network or module-loading error will
+be logged there.
+
+## 11. Local Development
 
 No build tooling required. Serve the folder with any static file server and
 open it in a browser, e.g.:

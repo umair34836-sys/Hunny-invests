@@ -49,7 +49,7 @@
 }
 
 * { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; }
+html { -webkit-text-size-adjust: 100%; overflow-x: hidden; }
 body {
   margin: 0;
   font-family: var(--font-body);
@@ -58,6 +58,8 @@ body {
   font-size: 15px;
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  width: 100%;
 }
 h1, h2, h3, h4 { margin: 0 0 0.4em; line-height: 1.25; font-weight: 700; letter-spacing: -0.01em; }
 p { margin: 0 0 1em; color: var(--color-text-muted); }
@@ -102,7 +104,9 @@ ul { padding-left: 1.2em; }
 .input, select.input, textarea.input {
   width: 100%; padding: 12px 14px; border-radius: var(--radius-sm);
   border: 1.5px solid var(--color-border); background: var(--color-surface);
-  font-size: 14.5px; color: var(--color-text); transition: border-color .15s;
+  /* 16px minimum: iOS Safari auto-zooms the whole page on focus for any
+     input below this size, which feels broken on mobile. */
+  font-size: 16px; color: var(--color-text); transition: border-color .15s;
 }
 .input:focus, select.input:focus, textarea.input:focus { outline: none; border-color: var(--color-primary); }
 .input--prefix-wrap { position: relative; }
@@ -172,13 +176,25 @@ textarea.input { resize: vertical; min-height: 90px; }
 /* ------------------------------- State blocks ------------------------------- */
 .state-block { text-align: center; padding: 48px 20px; color: var(--color-text-muted); }
 .state-icon { font-size: 36px; margin-bottom: 12px; }
+.error-detail {
+  max-width: 480px; margin: 14px auto 0; padding: 10px 14px; border-radius: var(--radius-sm);
+  background: var(--color-danger-bg); color: var(--color-danger); font-size: 12.5px;
+  word-break: break-word; text-align: left;
+}
+.error-detail a { color: var(--color-danger); text-decoration: underline; font-weight: 700; }
+.error-detail code { background: rgba(0,0,0,0.06); padding: 1px 5px; border-radius: 4px; }
 .spinner { width: 34px; height: 34px; border: 3px solid var(--color-border); border-top-color: var(--color-primary); border-radius: 50%; margin: 0 auto 14px; animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .skeleton-card { height: 110px; border-radius: var(--radius-lg); background: linear-gradient(90deg, var(--color-surface-alt) 25%, #e6eaf1 37%, var(--color-surface-alt) 63%); background-size: 400% 100%; animation: shimmer 1.4s ease infinite; margin-bottom: 14px; }
 @keyframes shimmer { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
 
 /* --------------------------------- Public nav ------------------------------- */
-#site-header { position: sticky; top: 0; z-index: 500; background: rgba(255,255,255,0.92); backdrop-filter: blur(8px); border-bottom: 1px solid var(--color-border); }
+/* No backdrop-filter here: it would make this sticky header a new containing
+   block for its position:fixed descendants (the mobile nav drawer), breaking
+   full-viewport positioning of the slide-in menu. */
+/* min-height stops the header collapsing to 0px (and the page jumping)
+   while it's still empty, waiting on renderPublicNav() to run. */
+#site-header { position: sticky; top: 0; z-index: 500; min-height: 64px; background: rgba(255,255,255,0.97); border-bottom: 1px solid var(--color-border); }
 .nav-wrap { max-width: 1180px; margin: 0 auto; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; height: 64px; }
 .brand { display: flex; align-items: center; gap: 9px; font-weight: 800; font-size: 17px; color: var(--color-navy); }
 .brand__mark { width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(135deg, var(--color-primary), var(--color-teal)); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 15px; }
@@ -202,6 +218,15 @@ textarea.input { resize: vertical; min-height: 90px; }
 .footer-note { color: #92a1b8; font-size: 13px; }
 .footer-bottom { text-align: center; font-size: 12.5px; color: #7c8ba3; padding: 24px 16px; margin-top: 24px; border-top: 1px solid rgba(255,255,255,0.08); }
 .footer-bottom a { color: #aab8cc; }
+
+/* ------------------------------- Ad slots -------------------------------- *
+ * Google AdSense placements (see js/ads.js). Render nothing until an
+ * AdSense publisher ID is configured, so these take up no space by default. */
+.ad-slot { text-align: center; margin: 20px auto; max-width: 728px; }
+.ad-slot__label { display: block; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-text-faint); margin-bottom: 6px; }
+.footer-ad { max-width: 1180px; margin: 0 auto; padding: 0 16px; }
+.footer-ad .ad-slot { margin: 0 auto 8px; }
+.footer-ad .ad-slot__label { color: #7c8ba3; }
 
 /* --------------------------------- Hero ---------------------------------- */
 .hero { padding: 44px 0 20px; background: radial-gradient(circle at top right, var(--color-primary-light), transparent 60%); }

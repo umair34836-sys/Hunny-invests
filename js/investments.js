@@ -7,9 +7,9 @@
 import { db, EARLY_EXIT_FEE_PERCENT } from "./firebase-config.js";
 import {
   COLLECTIONS, docRef, col, doc, runTransaction, serverTimestamp,
-  getMany, getOne, where, orderBy, fsLimit, increment
+  getMany, getOne, where, increment
 } from "./firestore.js";
-import { round2 } from "./utils.js";
+import { round2, sortByField } from "./utils.js";
 import {
   calculateInvestorProfit, calculateExpectedPayout, calculateStockShare,
   validateInvestmentAmount, calculateEarlyExitFee, calculateEarlyExitRefund
@@ -217,11 +217,13 @@ export async function getInvestment(id) {
 }
 
 export async function getInvestorInvestments(investorId, max = 200) {
-  return getMany(COLLECTIONS.INVESTMENTS, where("investorId", "==", investorId), orderBy("investedAt", "desc"), fsLimit(max));
+  const items = await getMany(COLLECTIONS.INVESTMENTS, where("investorId", "==", investorId));
+  return sortByField(items, "investedAt", "desc", max);
 }
 
 export async function getOpportunityInvestments(opportunityId) {
-  return getMany(COLLECTIONS.INVESTMENTS, where("opportunityId", "==", opportunityId), orderBy("investedAmount", "desc"));
+  const items = await getMany(COLLECTIONS.INVESTMENTS, where("opportunityId", "==", opportunityId));
+  return sortByField(items, "investedAmount", "desc");
 }
 
 export function filterInvestmentsByStage(investments, stage) {

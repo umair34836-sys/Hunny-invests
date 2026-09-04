@@ -18,6 +18,8 @@
     <p>Browse currently funding, active and past opportunities. Every card shows the required capital, funding progress, advertised return and duration up front.</p>
   </div>
 
+  <div id="opp-ad-slot"></div>
+
   <div class="filter-bar">
     <input class="input" id="f-search" placeholder="Search opportunities…">
     <select class="input" id="f-category">
@@ -47,6 +49,7 @@
   import { getOptionalSession } from "./js/guards.js";
   import { listPublicOpportunities, renderOpportunityCardHTML } from "./js/opportunities.js";
   import { debounce, escapeHTML } from "./js/utils.js";
+  import { renderAdSlot } from "./js/ads.js";
 
   let allOpportunities = [];
 
@@ -73,6 +76,7 @@
     grid.innerHTML = skeletonCards(6);
     const session = await getOptionalSession();
     renderPublicNav("opportunities", session);
+    renderAdSlot("opp-ad-slot", "oppInline");
 
     const sort = document.getElementById("f-sort").value;
     try {
@@ -87,7 +91,7 @@
       applyFilters();
     } catch (e) {
       console.error(e);
-      grid.outerHTML = `<div id="opp-grid">${errorHTML("Could not load opportunities right now.")}</div>`;
+      grid.outerHTML = `<div id="opp-grid">${errorHTML("Could not load opportunities right now.", e)}</div>`;
     }
   }
 
