@@ -3,6 +3,7 @@
 import { PLATFORM_NAME } from "./firebase-config.js";
 import { logoutUser } from "./auth.js";
 import { escapeHTML } from "./utils.js";
+import { renderAdSlot } from "./ads.js";
 
 /* ---------------------------------- Toasts --------------------------------- */
 
@@ -255,7 +256,9 @@ function renderPublicFooter() {
         <a href="risk-disclosure.html">Risk Disclosure</a>
       </div>
     </div>
+    <div class="footer-ad" id="footer-ad-slot"></div>
     <div class="footer-bottom">© ${new Date().getFullYear()} ${escapeHTML(PLATFORM_NAME)}. All rights reserved. Investing involves risk — read our <a href="risk-disclosure.html">Risk Disclosure</a>.</div>`;
+  renderAdSlot("footer-ad-slot", "footer");
 }
 
 const NAV_BY_ROLE = {

@@ -1,0 +1,4 @@
+# Authorized digital sellers for this site — required by Google AdSense.
+# Replace pub-0000000000000000 with your real AdSense publisher ID
+# (same value as ADSENSE_CLIENT in js/ads.js) once your account is approved.
+google.com, pub-0000000000000000, DIRECT, f08c47fec0942fa0

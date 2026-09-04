@@ -211,7 +211,32 @@ Auth UID → Grant Admin Access.
   decimal places at every step (a documented, simpler alternative to
   integer-paisa storage, per the spec's explicit allowance in §31).
 
-## 8. Known Limitations & Production Notes
+## 8. Monetization (Google AdSense)
+
+The platform earns from passive display ads shown to visitors — not from
+paying/rewarding users for watching ads. That "watch an ad, get credited"
+model was deliberately left out: with no backend (Firestore rules are the
+only access control here), a client-side "ad finished" event can be faked
+from the browser console with nothing to catch it. Passive ads have no such
+risk since the ad network itself validates impressions/clicks.
+
+Ad slots already exist in the code (footer on every public page, plus one
+inline slot each on the homepage and the opportunities list) and render
+nothing until you configure a real AdSense account:
+
+1. Sign up at <https://www.google.com/adsense> and get this site approved.
+2. In `js/ads.js`, replace `ADSENSE_CLIENT` with your real
+   `ca-pub-XXXXXXXXXXXXXXXX` publisher ID.
+3. Replace the placeholder values in `AD_SLOTS` (same file) with real ad
+   unit IDs from your AdSense dashboard (Ads → By ad unit → Display ads).
+4. Replace the placeholder `pub-` id in `/ads.txt` (repo root) with the same
+   publisher ID — AdSense requires this file to list the domain as an
+   authorized seller.
+
+Once step 2 is done, ad slots activate automatically everywhere they're
+already placed — no further code changes needed to go live.
+
+## 9. Known Limitations & Production Notes
 
 This mirrors the specification's own stated limitations (§27/§37/§38) —
 please read them before trusting this build with real money at scale:
@@ -237,7 +262,7 @@ please read them before trusting this build with real money at scale:
   as a participation *record* (`stockSharePercent` on each investment), not
   a guarantee of physical delivery — per spec §13.
 
-## 9. Troubleshooting
+## 10. Troubleshooting
 
 **"Could not load your dashboard" (or any list page) right after logging in.**
 Every dashboard/list page shows the underlying error beneath the message —
@@ -260,7 +285,7 @@ console (or the debug view in Chrome for Android: `chrome://inspect` from a
 desktop Chrome connected via USB) — a network or module-loading error will
 be logged there.
 
-## 10. Local Development
+## 11. Local Development
 
 No build tooling required. Serve the folder with any static file server and
 open it in a browser, e.g.:
