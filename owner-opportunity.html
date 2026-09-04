@@ -34,10 +34,17 @@
     const opp = await getOpportunity(id).catch(() => null);
     if (!opp || opp.ownerId !== session.user.uid) { page.innerHTML = errorHTML("Opportunity not found."); return; }
 
-    const [investments, summary] = await Promise.all([
-      getOpportunityInvestments(id),
-      getOpportunityFinancialSummary(id)
-    ]);
+    let investments, summary;
+    try {
+      [investments, summary] = await Promise.all([
+        getOpportunityInvestments(id),
+        getOpportunityFinancialSummary(id)
+      ]);
+    } catch (e) {
+      console.error(e);
+      page.innerHTML = errorHTML("Could not load this opportunity's investors and financials.", e);
+      return;
+    }
     const progress = calculateFundingProgress(opp.fundedAmount, opp.requiredCapital);
     const obligation = calculateTotalReturnObligation(opp.fundedAmount, opp.investorReturnPercent);
 

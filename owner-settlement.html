@@ -32,7 +32,15 @@
     if (!id) { page.innerHTML = errorHTML("No opportunity specified."); return; }
     const opp = await getOpportunity(id).catch(() => null);
     if (!opp || opp.ownerId !== session.user.uid) { page.innerHTML = errorHTML("Opportunity not found."); return; }
-    const settlements = await getSettlementsForOpportunity(id);
+
+    let settlements;
+    try {
+      settlements = await getSettlementsForOpportunity(id);
+    } catch (e) {
+      console.error(e);
+      page.innerHTML = errorHTML("Could not load settlement records.", e);
+      return;
+    }
     const obligation = calculateTotalReturnObligation(opp.fundedAmount, opp.investorReturnPercent);
 
     page.innerHTML = `
