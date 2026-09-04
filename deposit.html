@@ -13,16 +13,55 @@
 
 <script type="module">
   import { requireAuth } from "./js/guards.js";
-  import { renderAppShell, toast, errorHTML } from "./js/ui.js";
+  import { renderAppShell, toast, errorHTML, loadingHTML } from "./js/ui.js";
   import { createDepositRequest } from "./js/wallet.js";
   import { getUnreadCount } from "./js/notifications.js";
   import { isPositiveNumber, validateForm } from "./js/validators.js";
+  import { getOne, COLLECTIONS } from "./js/firestore.js";
+  import { escapeHTML } from "./js/utils.js";
+
+  // Platform-controlled defaults — an admin can change or disable either
+  // method any time from admin-settings.html without a code change; these
+  // are only the fallback shown before that doc has ever been saved.
+  const DEFAULT_SETTINGS = {
+    bankEnabled: false,
+    bankName: "Al Habib Bank",
+    accountTitle: "Tariq Mehmood",
+    accountNumber: "PK38 BAHL 20260908100107801",
+    walletEnabled: true,
+    walletTitle: "Tariq Mehmood",
+    walletNumber: "0301-8858303",
+    supportEmail: "Hunnycollectionpk@gmail.com"
+  };
 
   async function init() {
     const session = await requireAuth(["investor"]);
     if (!session) return;
     const unreadCount = await getUnreadCount(session.user.uid);
     const page = renderAppShell({ role: "investor", active: "wallet", title: "Deposit Funds", profile: session.profile, unreadCount });
+    page.innerHTML = loadingHTML("Loading payment instructions…");
+
+    let settings;
+    try {
+      settings = { ...DEFAULT_SETTINGS, ...(await getOne(COLLECTIONS.PLATFORM_SETTINGS, "general")) };
+    } catch (e) {
+      console.error(e);
+      page.innerHTML = errorHTML("Could not load payment instructions.", e);
+      return;
+    }
+
+    const methodOptions = [];
+    if (settings.walletEnabled) {
+      methodOptions.push(
+        { value: "easypaisa", label: "EasyPaisa" },
+        { value: "jazzcash", label: "JazzCash" },
+        { value: "sadapay", label: "SadaPay" },
+        { value: "upaisa", label: "UPaisa" }
+      );
+    }
+    if (settings.bankEnabled) {
+      methodOptions.push({ value: "bank_transfer", label: "Bank Transfer" });
+    }
 
     page.innerHTML = `
       <div class="alert alert--info">
@@ -33,10 +72,18 @@
 
       <div class="card" style="margin-bottom:20px;">
         <h3>Payment Instructions</h3>
-        <div class="kv-row"><span>Bank</span><span>Meezan Bank</span></div>
-        <div class="kv-row"><span>Account Title</span><span>Hunny Invests (Pvt.) Ltd.</span></div>
-        <div class="kv-row"><span>Account Number</span><span>PK00 MEZN 0000 0000 1234 5678</span></div>
-        <div class="kv-row"><span>Also accepted</span><span>EasyPaisa / JazzCash — contact support for details</span></div>
+        ${settings.walletEnabled ? `
+          <div class="kv-row"><span>Mobile Wallet</span><span>EasyPaisa · JazzCash · SadaPay · UPaisa</span></div>
+          <div class="kv-row"><span>Account Title</span><span>${escapeHTML(settings.walletTitle)}</span></div>
+          <div class="kv-row"><span>Number</span><span>${escapeHTML(settings.walletNumber)}</span></div>
+        ` : ""}
+        ${settings.bankEnabled ? `
+          ${settings.walletEnabled ? `<hr class="divider">` : ""}
+          <div class="kv-row"><span>Bank</span><span>${escapeHTML(settings.bankName)}</span></div>
+          <div class="kv-row"><span>Account Title</span><span>${escapeHTML(settings.accountTitle)}</span></div>
+          <div class="kv-row"><span>Account Number / IBAN</span><span>${escapeHTML(settings.accountNumber)}</span></div>
+        ` : ""}
+        ${!settings.walletEnabled && !settings.bankEnabled ? `<p class="text-muted">No deposit method is currently available. Please contact support at ${escapeHTML(settings.supportEmail)}.</p>` : ""}
       </div>
 
       <div class="card">
@@ -47,22 +94,19 @@
         </div>
         <div class="form-group">
           <label class="form-label">Payment Method</label>
-          <select class="input" id="method">
-            <option value="bank_transfer">Bank Transfer</option>
-            <option value="easypaisa">EasyPaisa</option>
-            <option value="jazzcash">JazzCash</option>
-            <option value="cash">Cash</option>
+          <select class="input" id="method" ${methodOptions.length ? "" : "disabled"}>
+            ${methodOptions.length ? methodOptions.map((m) => `<option value="${m.value}">${m.label}</option>`).join("") : `<option>No method available</option>`}
           </select>
         </div>
         <div class="form-group">
           <label class="form-label">Transaction Reference / Notes</label>
-          <textarea class="input" id="reference" rows="3" placeholder="e.g. Bank transfer ref# 123456, sent 3 Sep 2026"></textarea>
+          <textarea class="input" id="reference" rows="3" placeholder="e.g. EasyPaisa TID 123456, sent 3 Sep 2026"></textarea>
         </div>
         <div class="form-error" id="form-error"></div>
-        <button class="btn btn--primary btn--block" id="submit-btn">Submit Deposit Request</button>
+        <button class="btn btn--primary btn--block" id="submit-btn" ${methodOptions.length ? "" : "disabled"}>Submit Deposit Request</button>
       </div>`;
 
-    document.getElementById("submit-btn").addEventListener("click", async () => {
+    document.getElementById("submit-btn")?.addEventListener("click", async () => {
       const amount = Number(document.getElementById("amount").value);
       const method = document.getElementById("method").value;
       const reference = document.getElementById("reference").value.trim();

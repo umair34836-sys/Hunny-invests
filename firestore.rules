@@ -395,7 +395,11 @@ service cloud.firestore {
 
     // ---------------------------- platformSettings ------------------------------------------
     match /platformSettings/{settingId} {
-      allow read: if isSignedIn();
+      // Public: deposit instructions and support contact info are shown on
+      // public pages (contact.html) to visitors who haven't logged in yet.
+      // Nothing sensitive lives here — the bank/wallet details are meant to
+      // be handed to any investor anyway.
+      allow read: if true;
       allow write: if isAdmin();
     }
 
