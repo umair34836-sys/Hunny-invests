@@ -192,7 +192,9 @@ textarea.input { resize: vertical; min-height: 90px; }
 /* No backdrop-filter here: it would make this sticky header a new containing
    block for its position:fixed descendants (the mobile nav drawer), breaking
    full-viewport positioning of the slide-in menu. */
-#site-header { position: sticky; top: 0; z-index: 500; background: rgba(255,255,255,0.97); border-bottom: 1px solid var(--color-border); }
+/* min-height stops the header collapsing to 0px (and the page jumping)
+   while it's still empty, waiting on renderPublicNav() to run. */
+#site-header { position: sticky; top: 0; z-index: 500; min-height: 64px; background: rgba(255,255,255,0.97); border-bottom: 1px solid var(--color-border); }
 .nav-wrap { max-width: 1180px; margin: 0 auto; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; height: 64px; }
 .brand { display: flex; align-items: center; gap: 9px; font-weight: 800; font-size: 17px; color: var(--color-navy); }
 .brand__mark { width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(135deg, var(--color-primary), var(--color-teal)); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 15px; }

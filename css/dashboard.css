@@ -3,6 +3,28 @@
 
 #app-shell { min-height: 100vh; display: flex; }
 
+/* Instant boot spinner: #app-shell starts as an empty <div> in the HTML
+   and stays that way until the page's script resolves auth + renders the
+   real shell — without this, that gap is a blank white screen. :empty
+   matches only while no content has been injected yet, so this needs no
+   JS of its own and can never get "stuck" showing once real content
+   lands. */
+#app-shell:empty {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#app-shell:empty::after {
+  content: "";
+  width: 34px;
+  height: 34px;
+  border: 3px solid var(--color-border);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
 /* ---------------------------------- Sidebar --------------------------------- */
 .sidebar { display: none; }
 .sidebar-nav { display: flex; flex-direction: column; gap: 2px; flex: 1; margin-top: 24px; }
