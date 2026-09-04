@@ -66,7 +66,17 @@ service cloud.firestore {
     // Role & status live here. Never trust client-provided role/status changes
     // except through the narrow, admin-gated paths below.
     match /users/{userId} {
-      allow read: if isSelf(userId) || isAdmin();
+      // Fetching a single known user by id: only yourself or an admin.
+      allow get: if isSelf(userId) || isAdmin();
+
+      // Listing/querying the collection: admins can list anything; anyone
+      // signed in may list ONLY documents whose role is admin/super_admin
+      // (this is what lets an owner/investor action route a notification to
+      // "the admins" without exposing other users). Firestore validates that
+      // the query itself can only ever match documents satisfying this
+      // condition — a query for any other role, or an unfiltered query, is
+      // still rejected for a non-admin caller.
+      allow list: if isAdmin() || (isSignedIn() && resource.data.role in ['admin', 'super_admin']);
 
       // Self-registration only: always role=investor, status=active.
       allow create: if isSelf(userId)
@@ -340,7 +350,13 @@ service cloud.firestore {
 
     // --------------------------------- expenses --------------------------------------
     match /expenses/{expenseId} {
-      allow read: if isSignedIn() && (resource.data.ownerId == request.auth.uid || isAdmin());
+      // Checked via opportunityId (the field getExpensesForOpportunity()
+      // actually filters by) rather than ownerId directly — Firestore can
+      // only validate a list/query rule against fields the query itself
+      // constrains; a rule referencing an unconstrained field silently
+      // rejects the query for every non-admin caller.
+      allow read: if isAdmin()
+        || (isSignedIn() && opportunityOwnerId(resource.data.opportunityId) == request.auth.uid);
       allow create: if isSelf(request.resource.data.ownerId)
         && opportunityOwnerId(request.resource.data.opportunityId) == request.auth.uid
         && request.resource.data.approvalStatus == 'pending';
